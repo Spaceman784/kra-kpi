@@ -1138,10 +1138,65 @@
         font-size: 36px;
       }
     }
+
+    /* ---- Sign-in gate ---- */
+    #loginScreen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .login-card {
+      width: 100%; max-width: 360px;
+      background: var(--panel);
+      border: 1px solid var(--line); border-radius: 16px;
+      box-shadow: var(--shadow-strong);
+      padding: 30px 28px;
+      display: flex; flex-direction: column; gap: 13px;
+    }
+    .login-brand { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+    .login-title { font-size: 14px; color: var(--ink-2); font-weight: 600; margin-top: -9px; }
+    .login-sub { font-size: 13px; color: var(--ink-3); margin-bottom: 6px; }
+    .login-card label {
+      font-size: 11px; font-weight: 700; color: var(--ink-3);
+      display: flex; flex-direction: column; gap: 6px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .login-card input {
+      font-family: inherit; font-size: 14px; padding: 10px 12px; font-weight: 400;
+      border: 1px solid var(--line); border-radius: 9px;
+      background: var(--bg-2); color: var(--ink);
+      text-transform: none; letter-spacing: 0;
+    }
+    .login-card input:focus { outline: none; border-color: var(--ink-3); }
+    .login-btn {
+      margin-top: 6px; padding: 11px; border: 0; border-radius: 9px;
+      background: var(--ink); color: var(--bg);
+      font-weight: 600; font-size: 14px; cursor: pointer; font-family: inherit;
+    }
+    .login-btn:hover { opacity: 0.9; }
+    .login-error { color: var(--off); font-size: 12.5px; min-height: 16px; }
+    .whoami { font-size: 12px; color: var(--ink-3); align-self: center; }
   </style>
 </head>
 
 <body>
+  <div id="loginScreen">
+    <form id="loginForm" class="login-card">
+      <div class="login-brand">Nap Chief</div>
+      <div class="login-title">KPI Dashboard</div>
+      <div class="login-sub">Sign in to view the team boards.</div>
+      <label>Name
+        <input id="loginName" type="text" autocomplete="name" placeholder="Your name" />
+      </label>
+      <label>Password
+        <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••" />
+      </label>
+      <button type="submit" class="login-btn">Sign in</button>
+      <div class="login-error" id="loginError"></div>
+    </form>
+  </div>
+
   <div class="wrap">
 
     <header class="top">
@@ -1151,8 +1206,10 @@
         <span class="source-pill" id="sourcePill">Source: sample data</span>
       </div>
       <div class="top-right">
+        <span id="whoami" class="whoami"></span>
         <button id="refreshBtn" class="refresh-btn" title="Pull the latest data from the sheet">⟳ Refresh</button>
         <button id="themeToggle" class="theme-toggle">🌙 Dark</button>
+        <button id="signOutBtn" class="theme-toggle" title="Sign out">Sign out</button>
         <div class="meta">
           <span id="weekStamp">—</span><br />
           Last updated: <span id="lastUpdated">just now</span>
@@ -2263,6 +2320,38 @@
       await loadAndRender(false);
       showScreen("tiles");
     })();
+
+    /* ---- Sign-in gate (client-side soft gate) ---- */
+    const AUTH_PASSWORD = "nap123";
+    function isAuthed() { try { return sessionStorage.getItem("napchief-auth") === "1"; } catch (e) { return false; } }
+    function currentUser() { try { return sessionStorage.getItem("napchief-user") || ""; } catch (e) { return ""; } }
+    function unlockDashboard() {
+      document.getElementById("loginScreen").style.display = "none";
+      const name = currentUser();
+      const who = document.getElementById("whoami");
+      if (who) who.textContent = name ? `Hi, ${name}` : "";
+    }
+    document.getElementById("loginForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = document.getElementById("loginName").value.trim();
+      const pass = document.getElementById("loginPass").value;
+      const err = document.getElementById("loginError");
+      if (!name) { err.textContent = "Please enter your name."; return; }
+      if (pass !== AUTH_PASSWORD) {
+        err.textContent = "Incorrect password. Please try again.";
+        document.getElementById("loginPass").value = "";
+        return;
+      }
+      try { sessionStorage.setItem("napchief-auth", "1"); sessionStorage.setItem("napchief-user", name); } catch (e) {}
+      err.textContent = "";
+      unlockDashboard();
+    });
+    document.getElementById("signOutBtn").addEventListener("click", () => {
+      try { sessionStorage.removeItem("napchief-auth"); sessionStorage.removeItem("napchief-user"); } catch (e) {}
+      location.reload();
+    });
+    // Skip the gate if already signed in this browser session.
+    if (isAuthed()) unlockDashboard();
   </script>
 </body>
 
