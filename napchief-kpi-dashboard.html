@@ -1261,6 +1261,11 @@
               <option value="all">All time</option>
             </select>
           </div>
+          <div class="filter-group">
+            <span>Find:</span>
+            <input type="search" id="boardSearch" list="boardNames" placeholder="Search name…" autocomplete="off" />
+            <datalist id="boardNames"></datalist>
+          </div>
         </div>
         <div class="applied-filters" id="appliedFilters"></div>
       </div>
@@ -2158,8 +2163,11 @@
       document.getElementById("view-tiles").classList.toggle("hidden", s !== "tiles");
       document.getElementById("view-board").classList.toggle("hidden", s !== "board");
     }
+    let boardSearch = "";
     function openTeam(team) {
       selectedTeam = team;
+      boardSearch = "";
+      const si = document.getElementById("boardSearch"); if (si) si.value = "";
       showScreen("board");
       refreshBoard();
       window.scrollTo(0, 0);
@@ -2170,20 +2178,29 @@
       document.getElementById("boardTitle").textContent =
         selectedTeam === "All" ? "All Teams" : selectedTeam;
       const ppl = teamPeople(selectedTeam);
+      // Hero summary stays team-wide (not affected by the name search)
       const counts = ppl.length ? statusCounts(ppl) : null;
       document.getElementById("heroOverview").innerHTML = counts ? heroOverviewHTML(counts) : "";
       document.getElementById("boardSummary").innerHTML = "";
+      // Autocomplete list of this team's names
+      document.getElementById("boardNames").innerHTML =
+        ppl.map(p => `<option value="${p.name}"></option>`).join("");
+      // Apply the name search to the cards only
+      const q = boardSearch.trim().toLowerCase();
+      const visible = q ? ppl.filter(p => p.name.toLowerCase().includes(q)) : ppl;
       let html;
       if (!ppl.length) {
         html = `<div class="card empty">No team members added to ${selectedTeam} yet.</div>`;
+      } else if (!visible.length) {
+        html = `<div class="card empty">No one matches “${boardSearch.trim()}”.</div>`;
       } else if (selectedTeam === "All") {
         const groups = {};
-        ppl.forEach(p => { (groups[p.dept] = groups[p.dept] || []).push(p); });
+        visible.forEach(p => { (groups[p.dept] = groups[p.dept] || []).push(p); });
         const order = [...DEPARTMENTS, ...Object.keys(groups).filter(d => !DEPARTMENTS.includes(d))];
         html = order.filter(d => groups[d]).map(d =>
           `<div class="board-group-label">${d}</div>` + groups[d].map(personCard).join("")).join("");
       } else {
-        html = ppl.map(personCard).join("");
+        html = visible.map(personCard).join("");
       }
       document.getElementById("boardContent").innerHTML = html;
     }
@@ -2273,6 +2290,7 @@
     }));
     document.getElementById("asOfDate").addEventListener("change", e => { asOfDate = e.target.value; refreshBoard(); });
     document.getElementById("rangeFilter").addEventListener("change", e => { currentRange = e.target.value; refreshBoard(); });
+    document.getElementById("boardSearch").addEventListener("input", e => { boardSearch = e.target.value; renderBoard(); });
     document.getElementById("timewarpReset").addEventListener("click", () => {
       asOfDate = latestAvailable; document.getElementById("asOfDate").value = asOfDate; refreshBoard();
     });
