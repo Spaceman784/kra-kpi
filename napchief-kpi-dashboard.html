@@ -1,0 +1,2269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Nap Chief — KPI Dashboard (v5 · table view)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --bg-2: #F7F7F8;
+      --panel: #FFFFFF;
+      --panel-strong: #F5F5F6;
+      --ink: #111111;
+      --ink-2: #333333;
+      --ink-3: #666666;
+      --ink-4: #999999;
+      --line: #E0E0E0;
+      --line-2: #EBEBEB;
+      --line-3: #F0F0F0;
+      --chip: #F0F0F2;
+      --chip-2: #E0E0E2;
+      --ontrack: #1B7D3A;
+      --ontrack-bg: #E6F4EA;
+      --watch: #B45309;
+      --watch-bg: #FEF3C7;
+      --off: #C62828;
+      --off-bg: #FEECEC;
+      --notupdated: #999999;
+      --accent: #2563EB;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-strong: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    /* Dark theme — warm, low-glare, matches the light palette's character */
+    [data-theme="dark"] {
+      --bg: #111111;
+      --bg-2: #1A1A1A;
+      --panel: #1E1E1E;
+      --panel-strong: #252525;
+      --ink: #F0F0F0;
+      --ink-2: #D4D4D4;
+      --ink-3: #A0A0A0;
+      --ink-4: #6B6B6B;
+      --line: #333333;
+      --line-2: #3A3A3A;
+      --line-3: #2A2A2A;
+      --chip: #2A2A2A;
+      --chip-2: #383838;
+      --ontrack: #6DD58C;
+      --ontrack-bg: #1A3325;
+      --watch: #F0B756;
+      --watch-bg: #3D2E10;
+      --off: #F07070;
+      --off-bg: #3D1A1A;
+      --notupdated: #6B6B6B;
+      --accent: #5B9DF0;
+      --shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      --shadow-strong: 0 4px 16px rgba(0, 0, 0, 0.6);
+    }
+
+    [data-theme="dark"] select {
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' fill='none' stroke='%23A0A0A0' stroke-width='1.5'/></svg>");
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    body {
+      transition: background .2s ease, color .2s ease;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 36px 28px 80px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    header.top {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand {
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      font-size: 22px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .brand .sub {
+      color: var(--ink-3);
+      font-weight: 400;
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .meta {
+      color: var(--ink-3);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .meta .stamp {
+      color: var(--ink-2);
+      font-weight: 500;
+    }
+
+    .source-pill {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 8px;
+      background: var(--chip);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--ink-2);
+      letter-spacing: 0.02em;
+    }
+
+    .timewarp {
+      display: none;
+      background: #E8C77C;
+      border: 1px solid #C49545;
+      border-radius: 10px;
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #4A2F08;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+    }
+
+    .timewarp.visible {
+      display: flex;
+    }
+
+    .timewarp strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .timewarp button {
+      background: var(--ink);
+      border: 1px solid var(--ink);
+      color: #F5EAD0;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+    }
+
+    .timewarp button:hover {
+      background: var(--ink-2);
+    }
+
+    .company-strip {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: 22px;
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 24px;
+      align-items: center;
+      box-shadow: var(--shadow-strong);
+    }
+
+    .company-strip .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-3);
+      font-weight: 600;
+    }
+
+    .company-strip .label .h2 {
+      font-size: 16px;
+      text-transform: none;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    .company-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .company-metric {
+      border-left: 1px solid var(--line);
+      padding-left: 14px;
+    }
+
+    .company-metric .m-name {
+      font-size: 11px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .company-metric .m-val {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .company-metric .m-val.not-updated {
+      color: var(--notupdated);
+      font-weight: 500;
+      font-size: 14px;
+      font-style: italic;
+    }
+
+    .company-metric .m-sub {
+      font-size: 12px;
+      color: var(--ink-3);
+      margin-top: 2px;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .tabs {
+      display: inline-flex;
+      background: var(--line-2);
+      border-radius: 10px;
+      padding: 4px;
+    }
+
+    .tab {
+      border: 0;
+      background: transparent;
+      padding: 8px 16px;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink-2);
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .tab.active {
+      background: var(--panel);
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+    }
+
+    .filters {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      color: var(--ink-2);
+      font-size: 13px;
+    }
+
+    select,
+    input[type=search] {
+      appearance: none;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 28px 7px 12px;
+      font-size: 13px;
+      color: var(--ink);
+      font-family: inherit;
+      cursor: pointer;
+      outline: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' fill='none' stroke='%23333333' stroke-width='1.5'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      min-width: 150px;
+    }
+
+    input[type=search] {
+      background-image: none;
+      padding-right: 12px;
+      cursor: text;
+    }
+
+    input[type=search]:focus,
+    select:focus {
+      border-color: var(--ink-2);
+    }
+
+    #asOfDate {
+      min-width: 190px;
+      font-weight: 500;
+    }
+
+    .pillgroup {
+      display: inline-flex;
+      background: var(--line-2);
+      border-radius: 8px;
+      padding: 3px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      border: 0;
+      background: transparent;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--ink-2);
+      cursor: pointer;
+    }
+
+    .pill.active {
+      background: var(--panel);
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+    }
+
+    .applied-filters {
+      font-size: 12px;
+      color: var(--ink-3);
+      margin-bottom: 18px;
+    }
+
+    .applied-filters strong {
+      color: var(--ink-2);
+      font-weight: 500;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 {
+      margin: 0 0 2px;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .card .role {
+      color: var(--ink-3);
+      font-size: 12.5px;
+      margin-bottom: 14px;
+    }
+
+    .tier {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px dashed var(--line);
+    }
+
+    .tier:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+      margin-top: 2px;
+    }
+
+    .tier-label {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--ink-3);
+      font-weight: 600;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tier-label .cadence {
+      background: var(--chip);
+      padding: 1px 7px;
+      border-radius: 5px;
+      font-weight: 500;
+      color: var(--ink-2);
+      letter-spacing: 0.04em;
+    }
+
+    .tier-label .period-tag {
+      color: var(--ink-3);
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 11.5px;
+    }
+
+    /* ---- KPI TABLE — Excel-style bordered layout ---- */
+    .kpi-table-wrap {
+      overflow-x: auto;
+      margin-bottom: 4px;
+    }
+
+    table.kpi-table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 15.5px;
+      font-variant-numeric: tabular-nums;
+      border: 2px solid var(--ink);
+    }
+
+    table.kpi-table th,
+    table.kpi-table td {
+      padding: 14px 16px;
+      text-align: center;
+      border: 1px solid var(--ink);
+      white-space: nowrap;
+    }
+
+    /* Top-level week group header */
+    table.kpi-table thead tr.week-row th {
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink);
+      font-weight: 700;
+      background: var(--panel-strong);
+      border-bottom: 2px solid var(--ink);
+      border-left: 2px solid var(--ink);
+      padding: 10px 12px;
+    }
+
+    table.kpi-table thead tr.week-row th:first-child {
+      border-left: none;
+    }
+
+    /* Sub-header row (Target / Actual) */
+    table.kpi-table thead tr.sub-row th {
+      font-size: 12.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-2);
+      font-weight: 700;
+      background: var(--bg-2);
+      border-bottom: 2px solid var(--ink);
+      padding: 7px 10px;
+    }
+
+    table.kpi-table thead tr.sub-row th.sub-target {
+      border-left: 2px solid var(--ink);
+    }
+
+    table.kpi-table thead tr.sub-row th.sub-actual {
+      border-left: 1px solid var(--ink);
+    }
+
+    /* KPI name column */
+    table.kpi-table th.kpi-col,
+    table.kpi-table td.kpi-col {
+      text-align: left;
+      min-width: 200px;
+      white-space: normal;
+      border-right: 2px solid var(--ink);
+    }
+
+    table.kpi-table td.kpi-col {
+      font-weight: 600;
+      color: var(--ink);
+      font-size: 14.5px;
+    }
+
+    table.kpi-table .kpi-col .dot {
+      margin-right: 7px;
+      vertical-align: middle;
+    }
+
+    table.kpi-table tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    /* Target cell styling */
+    td.cell-target-val {
+      color: var(--ink-2);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    /* Actual cell styling — colored */
+    td.cell-actual-val {
+      font-weight: 800;
+      font-size: 18px;
+    }
+
+    td.cell-actual-val.s-ontrack {
+      color: var(--ontrack);
+    }
+
+    td.cell-actual-val.s-off,
+    td.cell-actual-val.s-watch {
+      color: var(--off);
+    }
+
+    td.cell-empty-val {
+      color: var(--ink-3);
+      font-weight: 500;
+    }
+
+    /* Week group left-border emphasis (selectors scoped to beat the base cell rule) */
+    table.kpi-table td.week-start,
+    table.kpi-table th.week-start {
+      border-left: 2px solid var(--ink);
+    }
+
+    /* Thin-but-visible divider between Target and Actual within a week */
+    table.kpi-table td.cell-actual-val,
+    table.kpi-table td.cell-empty-val {
+      border-left: 1px solid var(--ink);
+    }
+
+    /* Total month column */
+    table.kpi-table td.total-col,
+    table.kpi-table th.total-col {
+      border-left: 2px solid var(--ink);
+    }
+
+    table.kpi-table th.total-col {
+      background: var(--ontrack-bg);
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    /* VS last week column */
+    table.kpi-table td.vs-col,
+    table.kpi-table th.vs-col {
+      border-left: 2px solid var(--ink);
+      min-width: 140px;
+    }
+
+    .vs-cell {
+      text-align: center;
+    }
+
+    .vs-prev {
+      display: block;
+      font-size: 12px;
+      color: var(--ink-3);
+      margin-bottom: 2px;
+    }
+
+    .vs-delta {
+      display: block;
+      font-size: 16.5px;
+      font-weight: 800;
+    }
+
+    .vs-delta.change-up {
+      color: var(--ontrack);
+    }
+
+    .vs-delta.change-down {
+      color: var(--off);
+    }
+
+    .vs-delta.change-flat {
+      color: var(--ink-3);
+    }
+
+    /* Current week highlight */
+    td.col-now {
+      background: rgba(37, 99, 235, 0.04);
+    }
+
+    th.col-now {
+      background: rgba(37, 99, 235, 0.06);
+    }
+
+    /* Notes row */
+    .kpi-notes-row td {
+      text-align: left;
+      padding: 4px 10px 10px 38px;
+      font-size: 13px;
+      color: var(--ink-2);
+      font-style: italic;
+    }
+
+    .kpi-notes-row td::before {
+      content: '"';
+    }
+
+    .kpi-notes-row td::after {
+      content: '"';
+    }
+
+    .spark-inline {
+      vertical-align: middle;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      border: 1.5px solid;
+    }
+
+    .dot.ontrack {
+      background: var(--ontrack);
+      border-color: var(--ontrack);
+    }
+
+    .dot.watch {
+      background: var(--off);
+      border-color: var(--off);
+    }
+
+    .dot.off {
+      background: var(--off);
+      border-color: var(--off);
+    }
+
+    .dot.not-updated {
+      background: transparent;
+      border-color: var(--notupdated);
+      border-style: dashed;
+    }
+
+    .dept {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      margin-bottom: 14px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .dept-head {
+      background: var(--panel-strong);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--line-2);
+    }
+
+    .dept-head h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+    }
+
+    .dept-head .lead {
+      color: var(--ink-3);
+      font-size: 12.5px;
+      margin-top: 2px;
+    }
+
+    .dept-health {
+      font-size: 12px;
+      color: var(--ink-2);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--chip);
+      padding: 5px 10px;
+      border-radius: 7px;
+    }
+
+    .dept-body {
+      padding: 4px 22px 18px;
+    }
+
+    .dept-person-block {
+      padding: 16px 0;
+      border-top: 1px dashed var(--line);
+    }
+
+    .dept-person-block:first-child {
+      border-top: 0;
+    }
+
+    .dept-person-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .dept-person-head .pname {
+      font-size: 14.5px;
+      font-weight: 600;
+    }
+
+    .dept-person-head .prole {
+      font-size: 12px;
+      color: var(--ink-3);
+    }
+
+    .legend {
+      margin-top: 28px;
+      padding: 16px 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-size: 12.5px;
+      color: var(--ink-2);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: center;
+      box-shadow: var(--shadow);
+    }
+
+    .legend strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .legend .item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .empty {
+      padding: 22px;
+      color: var(--ink-3);
+      font-style: italic;
+      text-align: center;
+    }
+
+    /* ---- Department tiles (landing) ---- */
+    .home-head {
+      margin: 8px 0 18px;
+    }
+
+    .home-head h2 {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .home-head p {
+      margin: 4px 0 0;
+      color: var(--ink-3);
+      font-size: 13px;
+    }
+
+    .tile-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .tile {
+      flex: 0 1 250px;
+      max-width: 300px;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px 18px 14px;
+      box-shadow: var(--shadow);
+      transition: transform .12s, box-shadow .12s, border-color .12s;
+    }
+
+    .tile:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-strong);
+      border-color: var(--ink-4);
+    }
+
+    .tile.all {
+      background: var(--panel-strong);
+      border-color: var(--ink-4);
+    }
+
+    .tile-name {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .tile-sub {
+      font-size: 12.5px;
+      color: var(--ink-3);
+      margin-top: 2px;
+    }
+
+    .tile-foot {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .tile-count {
+      color: var(--ink-2);
+      font-weight: 500;
+    }
+
+    .tile-empty {
+      color: var(--ink-4);
+      font-style: italic;
+    }
+
+    .tile-stats {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .stat-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 7px;
+      background: var(--chip);
+      color: var(--ink-2);
+    }
+
+    .stat-chip .dot {
+      width: 8px;
+      height: 8px;
+    }
+
+    .stat-chip.ok {
+      background: var(--ontrack-bg);
+      color: var(--ontrack);
+    }
+
+    .stat-chip.bad {
+      background: var(--off-bg);
+      color: var(--off);
+    }
+
+    .stat-chip.watch {
+      background: var(--watch-bg);
+      color: var(--watch);
+    }
+
+    .stat-chip.na {
+      background: var(--chip);
+      color: var(--notupdated);
+    }
+
+    /* ---- Hero overview tiles (big On Track / Off Track at top of board) ---- */
+    .hero-overview {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .hero-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px 11px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      transition: transform .15s, box-shadow .15s;
+    }
+
+    .hero-tile:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-strong);
+    }
+
+    .hero-tile .hero-count {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-tile .hero-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 5px;
+    }
+
+    .hero-tile .hero-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-bottom: 5px;
+    }
+
+    .hero-tile.ok {
+      background: var(--ontrack-bg);
+      border-color: rgba(27, 125, 58, 0.2);
+    }
+
+    .hero-tile.ok .hero-count {
+      color: var(--ontrack);
+    }
+
+    .hero-tile.ok .hero-label {
+      color: var(--ontrack);
+    }
+
+    .hero-tile.ok .hero-dot {
+      background: var(--ontrack);
+    }
+
+    .hero-tile.bad {
+      background: var(--off-bg);
+      border-color: rgba(198, 40, 40, 0.2);
+    }
+
+    .hero-tile.bad .hero-count {
+      color: var(--off);
+    }
+
+    .hero-tile.bad .hero-label {
+      color: var(--off);
+    }
+
+    .hero-tile.bad .hero-dot {
+      background: var(--off);
+    }
+
+    .hero-tile.caution {
+      background: var(--watch-bg);
+      border-color: rgba(180, 83, 9, 0.2);
+    }
+
+    .hero-tile.caution .hero-count {
+      color: var(--watch);
+    }
+
+    .hero-tile.caution .hero-label {
+      color: var(--watch);
+    }
+
+    .hero-tile.caution .hero-dot {
+      background: var(--watch);
+    }
+
+    .hero-tile.neutral {
+      background: var(--chip);
+      border-color: var(--line);
+    }
+
+    .hero-tile.neutral .hero-count {
+      color: var(--notupdated);
+    }
+
+    .hero-tile.neutral .hero-label {
+      color: var(--notupdated);
+    }
+
+    .hero-tile.neutral .hero-dot {
+      background: var(--notupdated);
+    }
+
+    /* Board summary chips (same look, shown at top of a team board) */
+    .board-summary {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* Theme toggle */
+    .top-right {
+      display: flex;
+      align-items: flex-end;
+      gap: 14px;
+    }
+
+    .theme-toggle,
+    .refresh-btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink-2);
+      border-radius: 9px;
+      padding: 7px 12px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+
+    .theme-toggle:hover,
+    .refresh-btn:hover {
+      border-color: var(--ink-3);
+      color: var(--ink);
+    }
+
+    .refresh-btn:disabled {
+      opacity: .6;
+      cursor: default;
+    }
+
+    /* ---- Board bar ---- */
+    .board-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .back-btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink-2);
+      border-radius: 9px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .back-btn:hover {
+      border-color: var(--ink-3);
+      color: var(--ink);
+    }
+
+    .board-title {
+      font-size: 19px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-right: auto;
+    }
+
+    .board-group-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-3);
+      font-weight: 600;
+      margin: 20px 2px 8px;
+    }
+
+    .board-group-label:first-child {
+      margin-top: 2px;
+    }
+
+    /* ---- Simple "vs last week" change cell ---- */
+    .change-badge {
+      font-weight: 700;
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .change-up {
+      color: var(--ontrack);
+    }
+
+    .change-down {
+      color: var(--off);
+    }
+
+    .change-flat {
+      color: var(--ink-3);
+    }
+
+    .change-cap {
+      display: block;
+      font-size: 11px;
+      color: var(--ink-4);
+      margin-top: 2px;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 24px 16px 60px;
+      }
+
+      .tile-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-overview {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .hero-tile .hero-count {
+        font-size: 36px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <header class="top">
+      <div class="brand" id="brandLogo">
+        Nap Chief — KPI Dashboard
+        <div class="sub">v5 · per-period table view</div>
+        <span class="source-pill" id="sourcePill">Source: sample data</span>
+      </div>
+      <div class="top-right">
+        <button id="refreshBtn" class="refresh-btn" title="Pull the latest data from the sheet">⟳ Refresh</button>
+        <button id="themeToggle" class="theme-toggle">🌙 Dark</button>
+        <div class="meta">
+          <span id="weekStamp">—</span><br />
+          Last updated: <span id="lastUpdated">just now</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="timewarp" id="timewarp">
+      <span>You're viewing a past snapshot. <strong id="timewarpLabel"></strong></span>
+      <button id="timewarpReset">Back to latest</button>
+    </div>
+
+    <!-- Landing: department tiles -->
+    <div id="view-tiles">
+      <div class="home-head">
+        <h2>Team boards</h2>
+        <p>Pick a team to open its board — or “All Teams” to see everyone's KRA / KPIs.</p>
+      </div>
+      <div class="tile-grid" id="tileGrid"></div>
+    </div>
+
+    <!-- Team board -->
+    <div id="view-board" class="hidden">
+      <div class="board-bar">
+        <button id="backBtn" class="back-btn">← All teams</button>
+        <span class="board-title" id="boardTitle">Team</span>
+        <div class="pillgroup" id="tierPills">
+          <button class="pill active" data-tier="all">All KPIs</button>
+          <button class="pill" data-tier="northStar">North Star</button>
+          <button class="pill" data-tier="secondary">Secondary</button>
+          <button class="pill" data-tier="tertiary">Tertiary</button>
+        </div>
+      </div>
+      <div id="heroOverview" class="hero-overview"></div>
+      <div class="board-summary" id="boardSummary" style="margin-bottom:16px;"></div>
+      <div class="controls">
+        <div class="filters">
+          <div class="filter-group">
+            <span>As of:</span>
+            <select id="asOfDate"></select>
+          </div>
+          <div class="filter-group">
+            <span>Time range:</span>
+            <select id="rangeFilter">
+              <option value="auto" selected>Default per cadence</option>
+              <option value="4">Last 4 periods</option>
+              <option value="6">Last 6 periods</option>
+              <option value="12">Last 12 periods</option>
+              <option value="all">All time</option>
+            </select>
+          </div>
+        </div>
+        <div class="applied-filters" id="appliedFilters"></div>
+      </div>
+      <div id="boardContent" class="grid"></div>
+    </div>
+
+    <div class="legend">
+      <span class="item"><span class="dot ontrack"></span><strong>On track</strong></span>
+      <span class="item"><span class="dot watch"></span><strong>Watch</strong></span>
+      <span class="item"><span class="dot off"></span><strong>Off track</strong></span>
+      <span class="item"><span class="dot not-updated"></span><strong>Not updated</strong></span>
+      <span class="item" style="margin-left:auto;color:var(--ink-3)">North Star = Weekly · Secondary = Monthly ·
+        Tertiary = Quarterly</span>
+    </div>
+  </div>
+
+  <script>
+    /* =================================================================
+       DATA SOURCE
+       ================================================================= */
+    const DATA_SOURCE = {
+      mode: "liveSheets",   // "mock" | "csv" | "liveSheets"
+      sheetCsvUrl: "",      // used only when mode === "csv"
+    };
+
+    /* The fiscal year the tracker months/quarters belong to (June/July/Aug 2026, Q1–Q4 2026). */
+    const SHEET_YEAR = 2026;
+
+    /* Live Ops-team source sheets. Each person = one Google Sheet, with three tracker tabs
+       addressed by gid. The tabs must be shared "anyone with the link → Viewer".
+       Add more people / teams by appending entries here. */
+    const SHEET_SOURCES = [
+      {
+        person: "Vallabh S.", role: "Ops Intelligence", dept: "Ops",
+        id: "1J_dTvxvNbDffQMjp6AlkyNpXWmBG6StsA_i0OCjCG-Q",
+        tabs: { northStar: 1247030506, secondary: 2125993355, tertiary: 507913341 }
+      },
+      {
+        person: "Divya R.", role: "Ops — Process Automation", dept: "Ops",
+        id: "1KYpyiJpWZg5kFv32nAZEzMRTV0fojQDrO6K6LzZHc5A",
+        tabs: { northStar: 51527099, secondary: 1867378555, tertiary: 487583510 }
+      },
+      {
+        person: "Arjun P.", role: "Automation & Dashboards", dept: "Ops",
+        id: "1j--nddEIDxzymyPiNq9OyDdC2e7_isM4TbaBs0fHwvA",
+        tabs: { northStar: 772528706, secondary: 777830363, tertiary: 302051727 }
+      },
+      {
+        person: "Bhagyashree R.", role: "Ops", dept: "Ops",
+        id: "12t-9vSXqzFdpQpIIflLUrBwUU0IalI6PME5KlKXrdiQ",
+        tabs: { northStar: 1932597434, secondary: 1950157595, tertiary: 1685854395 }
+      },
+      {
+        person: "Ashutosh M.", role: "Ops", dept: "Ops",
+        id: "1zYK2zetPgJm0fYIzh14Ss78HTdkemTAz36QZ0Xvq14Y",
+        tabs: { northStar: 1931047281, secondary: 896617149, tertiary: 1336076099 }
+      },
+
+      /* ---- Shopify team ---- */
+      {
+        person: "Sheetal S.", role: "Shopify", dept: "Shopify",
+        id: "1AFVAiFgpDQ1Jm8xFFlOZg9c5INldr5S0WRJGe26q0gg",
+        tabs: { northStar: 1369241410, secondary: 184970846, tertiary: 1486714843 }
+      },
+      {
+        person: "Dhairya A.", role: "Shopify", dept: "Shopify",
+        id: "1eK6BgaSWJxonpWjA5kFSBWnrddWKrL8DVrUFqRgyrM8",
+        tabs: { northStar: 1527085220, secondary: 1520150515, tertiary: 729052827 }
+      },
+      {
+        person: "Mayuri S.", role: "Shopify", dept: "Shopify",
+        id: "1-Fnjs6YsvGDthNywGHY5gDpTNxe_GqTM8taMlXTnk1c",
+        tabs: { northStar: 1618315712, secondary: 206616182, tertiary: 1945310143 }
+      },
+      {
+        person: "Prathamesh L.", role: "Shopify", dept: "Shopify",
+        id: "14aDy8_Yn57hYhSsQdvwOvLcdUfWOXs2Btqg7BfnLzM4",
+        tabs: { northStar: 1129937916, secondary: 84881527, tertiary: 1551778286 }
+      },
+      {
+        person: "Meghna J.", role: "Shopify", dept: "Shopify",
+        id: "1zTu_8ErK1sikSQ0hyzhi4WRfmtFeLxHQHSU3HZlc5D0",
+        tabs: { northStar: 185649628, secondary: 822452531, tertiary: 2040180670 }
+      },
+
+      /* ---- CRM team ---- */
+      {
+        person: "Ayyan D.", role: "CRM — Customer Experience", dept: "CRM",
+        id: "1libsN0k-FxXUnHVXaK6sCZAUX5zUbU7H",
+        tabs: { northStar: 1701863161, secondary: 2138602517, tertiary: 727326529 }
+      },
+      {
+        person: "Shreya O.", role: "CRM", dept: "CRM",
+        id: "1ZlveVBHO_nAreSjHFqpTBj8EO5lg0ZSb",
+        tabs: { northStar: 2032660216, secondary: 1706244029, tertiary: 381908336 }
+      },
+      {
+        person: "Ritik R.", role: "CRM Manager", dept: "CRM",
+        id: "1kkHlS1LCL91L17iNC-6Qr7no5WKU_OQkAi1HEdwntKM",
+        tabs: { northStar: 190469364, secondary: 401263809, tertiary: 812704384 }
+      },
+
+      /* ---- Marketplace team ---- */
+      {
+        person: "Abdul S.", role: "Marketplace", dept: "Marketplace",
+        id: "19MGxU6R09_egUS8S8EIEruUn3ygddrdInWDLna_M4II",
+        tabs: { northStar: 149914579, secondary: 348134626, tertiary: 495838027 }
+      },
+      {
+        person: "Sejal", role: "Marketplace", dept: "Marketplace",
+        id: "1VICif20vxExvsZm7TaVT6PXLaiUi7ACtcDgtK7dKP-M",
+        tabs: { northStar: 995218266, secondary: 1529620887, tertiary: 37990653 }
+      },
+      {
+        person: "Varun", role: "Marketplace", dept: "Marketplace",
+        id: "1Bm7GdG--jICWuCvIJCP7_577pwGZ7q_UkvQLlymcYDA",
+        tabs: { northStar: 1674233894, secondary: 57119152, tertiary: 260171692 }
+      },
+
+      /* ---- Designer/Inventory team ---- */
+      {
+        person: "Dipti K.", role: "Designer/Inventory", dept: "Designer/Inventory",
+        id: "1qMLK_HDRVhoQIoTikuE3D5XrurmboxAIxZKZGQ6eDW8",
+        tabs: { northStar: 880727492, secondary: 841178146, tertiary: 933070005 }
+      },
+    ];
+
+    const MOCK_PEOPLE = [
+
+      /* Arjun — Ops. Real KRA/KPI structure from his tracker workbook. */
+      {
+        name: "Arjun P.", role: "Automation & Dashboards", dept: "Ops",
+        northStar: [
+          {
+            name: "Automation Projects Completed", goal_dir: "up", history: [
+              { period: "2026-04-27", target: "0.5", actual: "0.0", status: "off", notes: "Slow start, briefs still landing" },
+              { period: "2026-05-04", target: "0.5", actual: "0.6", status: "ontrack", notes: "CRM dashboard went live, zero rework" },
+              { period: "2026-05-11", target: "0.5", actual: "0.2", status: "off", notes: "One project bounced back for revision" },
+              { period: "2026-05-18", target: "0.5", actual: "0.5", status: "ontrack", notes: "Logistics GScript shipped clean" },
+            ]
+          },
+          {
+            name: "Time / Cost / Quality Impact (hrs saved/wk)", goal_dir: "up", history: [
+              { period: "2026-04-27", target: "10", actual: "6", status: "watch", notes: "" },
+              { period: "2026-05-04", target: "10", actual: "12", status: "ontrack", notes: "Reporting automation saving ~12 hrs/wk" },
+              { period: "2026-05-11", target: "10", actual: "9", status: "watch", notes: "" },
+              { period: "2026-05-18", target: "10", actual: "14", status: "ontrack", notes: "Teams still actively using builds" },
+            ]
+          },
+        ],
+        secondary: [
+          {
+            name: "Rework Rate % (≤15% target)", goal_dir: "down", history: [
+              { period: "2026-03-01", target: "15", actual: "22", status: "off", notes: "" },
+              { period: "2026-04-01", target: "15", actual: "18", status: "watch", notes: "Briefs getting clearer" },
+              { period: "2026-05-01", target: "15", actual: "12", status: "ontrack", notes: "Under target — fewer revisions" },
+            ]
+          },
+          {
+            name: "Automation Brief Delivery Rate %", goal_dir: "up", history: [
+              { period: "2026-03-01", target: "90", actual: "80", status: "watch", notes: "" },
+              { period: "2026-04-01", target: "90", actual: "85", status: "watch", notes: "" },
+              { period: "2026-05-01", target: "90", actual: "92", status: "ontrack", notes: "Proactive flagging working" },
+            ]
+          },
+        ],
+        tertiary: [
+          {
+            name: "AI Tool Adoption (examples/qtr)", goal_dir: "up", history: [
+              { period: "2026-01-01", target: "3", actual: "1", status: "watch", notes: "" },
+              { period: "2026-04-01", target: "3", actual: "3", status: "ontrack", notes: "Claude-written GScripts, 20min vs 3hr" },
+            ]
+          },
+          {
+            name: "Deliverable Documentation Rate %", goal_dir: "up", history: [
+              { period: "2026-01-01", target: "100", actual: "70", status: "watch", notes: "" },
+              { period: "2026-04-01", target: "100", actual: "90", status: "watch", notes: "Most handovers now have a 1-pager" },
+            ]
+          },
+          {
+            name: "Culture Rating (of 5)", goal_dir: "up", history: [
+              { period: "2026-01-01", target: "4.5", actual: "4.0", status: "watch", notes: "" },
+              { period: "2026-04-01", target: "4.5", actual: "4.3", status: "ontrack", notes: "Strong ownership & collaboration" },
+            ]
+          },
+        ],
+      },
+
+    ];
+
+    /* =================================================================
+       CSV loading (for going live off the published Database tab)
+       ================================================================= */
+    function parseCSV(text) {
+      const rows = []; let row = [], field = "", inQ = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQ) {
+          if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+          else if (c === '"') inQ = false;
+          else field += c;
+        } else {
+          if (c === '"') inQ = true;
+          else if (c === ",") { row.push(field); field = ""; }
+          else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+          else if (c === "\r") { }
+          else field += c;
+        }
+      }
+      if (field.length || row.length) { row.push(field); rows.push(row); }
+      if (!rows.length) return [];
+      const header = rows.shift().map(h => h.trim());
+      return rows.filter(r => r.some(x => x.trim() !== "")).map(r => {
+        const obj = {}; header.forEach((h, idx) => obj[h] = (r[idx] || "").trim()); return obj;
+      });
+    }
+    function rowsToPeople(rows) {
+      const people = new Map();
+      rows.forEach(r => {
+        if (!r.person || !r.kpi_name || !r.tier) return;
+        if (!people.has(r.person)) {
+          people.set(r.person, {
+            name: r.person, role: r.role || "", dept: r.dept || "—",
+            northStar: [], secondary: [], tertiary: [], _index: new Map()
+          });
+        }
+        const p = people.get(r.person);
+        const key = `${r.tier}::${r.kpi_name}`;
+        if (!p._index.has(key)) {
+          const kpi = { name: r.kpi_name, goal_dir: (r.goal_dir || "up").toLowerCase(), history: [] };
+          p._index.set(key, kpi);
+          if (p[r.tier]) p[r.tier].push(kpi);
+        }
+        p._index.get(key).history.push({
+          period: r.period_start || r.period, target: r.target, actual: r.actual,
+          status: (r.status || "watch").toLowerCase(), notes: r.notes || "",
+        });
+      });
+      for (const p of people.values()) {
+        ["northStar", "secondary", "tertiary"].forEach(t =>
+          (p[t] || []).forEach(k => k.history.sort((a, b) => (a.period > b.period ? 1 : -1))));
+        delete p._index;
+      }
+      return Array.from(people.values());
+    }
+    /* =================================================================
+       LIVE GOOGLE SHEETS — wide tracker → long rows
+       Each person's sheet has 3 tracker tabs in the standard Nap Chief layout:
+         North Star Tracker (weekly, W1–W4 blocks per month)
+         Operational Metrics Tracker (monthly, M1–M3 blocks per quarter)
+         T3 Hygiene Tracker (quarterly, Q1–Q4)
+       We fetch each tab as CSV (export?gid= → CORS-friendly), reshape into the
+       long format rowsToPeople() expects, and derive status from target vs actual.
+       ================================================================= */
+    const MONTHS = {
+      january: 0, february: 1, march: 2, april: 3, may: 4, june: 5, july: 6, august: 7,
+      september: 8, october: 9, november: 10, december: 11,
+      jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11
+    };
+
+    /* Parse raw CSV text into a 2-D grid (handles quotes); no header assumption. */
+    function csvGrid(text) {
+      const rows = []; let row = [], field = "", inQ = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQ) {
+          if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+          else if (c === '"') inQ = false;
+          else field += c;
+        } else {
+          if (c === '"') inQ = true;
+          else if (c === ",") { row.push(field); field = ""; }
+          else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+          else if (c === "\r") { }
+          else field += c;
+        }
+      }
+      if (field.length || row.length) { row.push(field); rows.push(row); }
+      return rows;
+    }
+
+    function mondaysOfMonth(year, m0) {
+      const out = []; const d = new Date(year, m0, 1);
+      while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
+      while (d.getMonth() === m0 && out.length < 4) { out.push(ymd(new Date(d))); d.setDate(d.getDate() + 7); }
+      return out;
+    }
+    function firstOfMonthDate(year, m0) { return ymd(new Date(year, m0, 1)); }
+    function firstOfQuarterDate(year, q) { return ymd(new Date(year, (q - 1) * 3, 1)); }
+    function quarterMonths(q) { return [(q - 1) * 3, (q - 1) * 3 + 1, (q - 1) * 3 + 2]; }
+
+    /* Lower-is-better KPIs (everything else is higher-is-better). */
+    function goalDirFor(name) {
+      const n = String(name).toLowerCase();
+      return /(revers|rework|return|stockout|defect|churn|\bcac\b|bounce|attrition|\btat\b|backlog|reverted|miss)/.test(n)
+        ? "down" : "up";
+    }
+    /* Derive a status from target vs actual (green/red; dashboard collapses watch→off). */
+    function statusFor(target, actual, goalDir) {
+      const t = num(target), a = num(actual);
+      if (isNaN(a)) return "";
+      if (isNaN(t)) return "ontrack";
+      const good = goalDir === "down" ? a <= t : a >= t;
+      return good ? "ontrack" : "off";
+    }
+
+    /* Reshape one tracker tab's grid into { rows, catalog }.
+       rows   = long-format entries for cells that have an Actual.
+       catalog = every KPI seen (so the person/KPI shows even before any data). */
+    function parseTrackerGrid(grid, cadence, src) {
+      const rows = [], catalog = [];
+      const tierKey = cadence === "Weekly" ? "northStar" : cadence === "Monthly" ? "secondary" : "tertiary";
+      let curMonthIdx = null, curQuarter = null;
+      for (const r of grid) {
+        const joined = r.join(" ");
+        if (cadence === "Weekly") {
+          // Matches "METRIC June", "METRICS JUNE", "NORTH STAR METRIC - JUNE", etc.
+          const m = joined.match(/METRICS?\s*[-–]?\s*([A-Za-z]+)/i);
+          if (m && MONTHS[m[1].toLowerCase()] !== undefined) curMonthIdx = MONTHS[m[1].toLowerCase()];
+        } else if (cadence === "Monthly") {
+          const m = joined.match(/\b(Q[1-4])\b/i);
+          if (m) curQuarter = parseInt(m[1][1], 10);
+        }
+        const tier = (r[0] || "").trim();
+        const altRow = !tier && /^(weekly|monthly|quarterly)$/i.test((r[1] || "").trim());
+        if (!/^T[123]$/.test(tier) && !altRow) continue;
+        const kpi = (r[2] || "").trim();
+        if (!kpi) continue;
+        const gd = goalDirFor(kpi);
+        const roll = ({ sum: "sum", avg: "avg", average: "avg", last: "last" })[(r[3] || "").trim().toLowerCase()];
+        catalog.push({ person: src.person, role: src.role, dept: src.dept, tierKey, kpi_name: kpi, goal_dir: gd, roll });
+        const emit = (period, target, actual) => {
+          if (period == null || String(actual).trim() === "") return;
+          rows.push({
+            person: src.person, role: src.role, dept: src.dept, tier: tierKey,
+            kpi_name: kpi, goal_dir: gd, period_start: period,
+            target: String(target).trim(), actual: String(actual).trim(),
+            status: statusFor(target, actual, gd), notes: ""
+          });
+        };
+        if (cadence === "Weekly") {
+          if (curMonthIdx === null) continue;
+          const mondays = mondaysOfMonth(SHEET_YEAR, curMonthIdx);
+          for (let i = 0; i < 4; i++) emit(mondays[i], r[4 + i * 2], r[5 + i * 2]);
+        } else if (cadence === "Monthly") {
+          if (curQuarter === null) continue;
+          const months = quarterMonths(curQuarter);
+          for (let i = 0; i < 3; i++) emit(firstOfMonthDate(SHEET_YEAR, months[i]), r[4 + i * 2], r[5 + i * 2]);
+        } else {
+          for (let q = 0; q < 4; q++) emit(firstOfQuarterDate(SHEET_YEAR, q + 1), r[4 + q * 2], r[5 + q * 2]);
+        }
+      }
+      return { rows, catalog };
+    }
+
+    /* Ensure every catalogued person/KPI exists, even with no data yet (empty history). */
+    function applyCatalog(people, catalog) {
+      const byName = new Map(people.map(p => [p.name, p]));
+      for (const c of catalog) {
+        let p = byName.get(c.person);
+        if (!p) {
+          p = { name: c.person, role: c.role, dept: c.dept, northStar: [], secondary: [], tertiary: [] };
+          byName.set(c.person, p); people.push(p);
+        }
+        if (!p.role) p.role = c.role;
+        if (!p.dept || p.dept === "—") p.dept = c.dept;
+        const list = p[c.tierKey] || (p[c.tierKey] = []);
+        let k = list.find(x => x.name === c.kpi_name);
+        if (!k) { k = { name: c.kpi_name, goal_dir: c.goal_dir, history: [] }; list.push(k); }
+        if (c.roll && !k.roll) k.roll = c.roll;   // honor the sheet's Roll-up (Sum/Avg) column
+      }
+      return people;
+    }
+
+    async function fetchSheetsRows() {
+      const rows = [], catalog = [];
+      const tabs = [["northStar", "Weekly"], ["secondary", "Monthly"], ["tertiary", "Quarterly"]];
+      const promises = [];
+
+      for (const src of SHEET_SOURCES) {
+        for (const [key, cadence] of tabs) {
+          const gid = src.tabs[key];
+          if (gid == null) continue;
+          const url = `https://docs.google.com/spreadsheets/d/${src.id}/export?format=csv&gid=${gid}`;
+          promises.push((async () => {
+            try {
+              const res = await fetch(url, { cache: "no-store" });
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const grid = csvGrid(await res.text());
+              const out = parseTrackerGrid(grid, cadence, src);
+              return out;
+            } catch (e) {
+              console.warn("Sheet fetch failed:", src.person, key, e);
+              return { rows: [], catalog: [] };
+            }
+          })());
+        }
+      }
+
+      const results = await Promise.all(promises);
+      for (const out of results) {
+        rows.push(...out.rows);
+        catalog.push(...out.catalog);
+      }
+      return { rows, catalog };
+    }
+
+    async function loadData(forceRefresh = false) {
+      if (DATA_SOURCE.mode === "liveSheets") {
+        if (!forceRefresh) {
+          try {
+            const cached = localStorage.getItem("napchief-kpis-cache");
+            const cachedTime = localStorage.getItem("napchief-kpis-cache-time");
+            if (cached) {
+              const people = JSON.parse(cached);
+              document.getElementById("sourcePill").textContent = "Source: Google Sheets (cached)";
+              if (cachedTime) {
+                document.getElementById("lastUpdated").textContent = cachedTime;
+              }
+              return people;
+            }
+          } catch (e) {
+            console.warn("Error reading cache:", e);
+          }
+        }
+
+        try {
+          const { rows, catalog } = await fetchSheetsRows();
+          const people = applyCatalog(rowsToPeople(rows), catalog);
+          document.getElementById("sourcePill").textContent = rows.length
+            ? "Source: Google Sheets (live)"
+            : "Source: Google Sheets (live · awaiting data)";
+
+          if (rows.length) {
+            try {
+              localStorage.setItem("napchief-kpis-cache", JSON.stringify(people));
+              const nowStr = new Date().toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
+              localStorage.setItem("napchief-kpis-cache-time", nowStr);
+            } catch (err) {
+              console.warn("Error saving to cache:", err);
+            }
+          }
+          return people;
+        } catch (e) {
+          console.warn("Live sheets failed:", e);
+          document.getElementById("sourcePill").textContent = "Source: sample data (live fetch failed)";
+          return MOCK_PEOPLE;
+        }
+      }
+      if (DATA_SOURCE.mode === "csv" && DATA_SOURCE.sheetCsvUrl) {
+        try {
+          const res = await fetch(DATA_SOURCE.sheetCsvUrl, { cache: "no-store" });
+          const rows = parseCSV(await res.text());
+          document.getElementById("sourcePill").textContent = "Source: Google Sheets (live)";
+          return rowsToPeople(rows);
+        } catch (e) {
+          console.warn("CSV fetch failed:", e);
+          document.getElementById("sourcePill").textContent = "Source: sample data (CSV fetch failed)";
+          return MOCK_PEOPLE;
+        }
+      }
+      return MOCK_PEOPLE;
+    }
+
+    /* =================================================================
+       PERIOD MATH
+       ================================================================= */
+    function ymd(d) { // local-time YYYY-MM-DD (avoids UTC off-by-one in IST etc.)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    function mondayOf(isoDate) {
+      const d = new Date(isoDate + "T00:00:00");
+      const dow = d.getDay();
+      const diff = (dow === 0 ? -6 : 1 - dow);
+      d.setDate(d.getDate() + diff);
+      return ymd(d);
+    }
+    function firstOfMonth(isoDate) {
+      const d = new Date(isoDate + "T00:00:00"); d.setDate(1);
+      return ymd(d);
+    }
+    function firstOfQuarter(isoDate) {
+      const d = new Date(isoDate + "T00:00:00");
+      const q = Math.floor(d.getMonth() / 3); d.setMonth(q * 3); d.setDate(1);
+      return ymd(d);
+    }
+    function normalizePeriod(iso, cadence) {
+      if (cadence === "Weekly") return mondayOf(iso);
+      if (cadence === "Monthly") return firstOfMonth(iso);
+      if (cadence === "Quarterly") return firstOfQuarter(iso);
+      return iso;
+    }
+    function rowAtPeriod(history, normalizedPeriod, cadence) {
+      return (history || []).find(h => normalizePeriod(h.period, cadence) === normalizedPeriod) || null;
+    }
+    function latestAtOrBefore(history, normalizedPeriod, cadence) {
+      let res = null;
+      (history || []).forEach(h => {
+        const np = normalizePeriod(h.period, cadence);
+        if (np <= normalizedPeriod && (!res || np > res._np)) res = { ...h, _np: np };
+      });
+      return res;
+    }
+
+    /* =================================================================
+       NUMERIC / FORMAT HELPERS
+       ================================================================= */
+    function num(s) {
+      if (s === null || s === undefined) return NaN;
+      const c = String(s).replace(/[^\d.\-]/g, '');
+      if (c === '' || c === '-' || c === '.') return NaN;
+      return parseFloat(c);
+    }
+    function unitSuffix(sample) { // trailing unit like L, Cr, K, M (e.g. "₹18.4L" → "L")
+      const m = String(sample || "").match(/[\d.]\s*(L|Cr|K|M|k|m)\s*$/);
+      return m ? m[1] : "";
+    }
+    function fmtDelta(delta, sample) {
+      const s = String(sample || "");
+      const sign = delta > 0 ? "+" : (delta < 0 ? "−" : "±");
+      const abs = Math.abs(delta);
+      const absStr = abs >= 100 ? abs.toFixed(0)
+        : abs >= 10 ? abs.toFixed(1)
+          : abs.toFixed(2).replace(/\.?0+$/, "");
+      if (s.includes("₹")) return `${sign}₹${absStr}${unitSuffix(s)}`;
+      if (s.includes("%")) return `${sign}${absStr}pp`;
+      if (s.includes("x")) return `${sign}${absStr}x`;
+      return `${sign}${absStr}${unitSuffix(s)}`;
+    }
+    function vsPrior(seq, goalDir) {
+      const vals = seq.filter(c => c && !isNaN(num(c.actual)));
+      if (vals.length < 2) return null;
+      const last = vals[vals.length - 1], prev = vals[vals.length - 2];
+      const a = num(last.actual), b = num(prev.actual);
+      const delta = a - b;
+      const good = goalDir === "down" ? delta < 0 : delta > 0;
+      return { text: fmtDelta(delta, last.actual), direction: delta === 0 ? "flat" : (good ? "up" : "down") };
+    }
+    function trendOver(seq, goalDir) {
+      const vals = seq.filter(c => c && !isNaN(num(c.actual))).map(c => num(c.actual));
+      if (vals.length < 3) return null;
+      const latest = vals[vals.length - 1];
+      const priors = vals.slice(0, -1);
+      const priorAvg = priors.reduce((a, b) => a + b, 0) / priors.length;
+      const delta = latest - priorAvg;
+      const base = Math.max(Math.abs(priorAvg), 1);
+      if (Math.abs(delta / base) < 0.03) return { label: "stable", direction: "flat" };
+      const good = goalDir === "down" ? delta < 0 : delta > 0;
+      return { label: good ? "improving" : "declining", direction: good ? "up" : "down" };
+    }
+    function sparkline(cells, w = 70, h = 18) {
+      const vals = cells.map(c => c ? num(c.actual) : NaN);
+      const tgts = cells.map(c => c ? num(c.target) : NaN);
+      const all = [...vals, ...tgts].filter(v => !isNaN(v));
+      if (all.length < 2) return "";
+      const min = Math.min(...all), max = Math.max(...all);
+      const range = (max - min) || Math.abs(max) || 1;
+      const padY = 2;
+      const yFor = v => h - padY - ((v - min) / range) * (h - 2 * padY);
+      const xFor = i => (i / (vals.length - 1)) * w;
+      const polyV = vals.map((v, i) => isNaN(v) ? null : `${xFor(i)},${yFor(v)}`).filter(Boolean).join(" ");
+      const polyT = tgts.map((v, i) => isNaN(v) ? null : `${xFor(i)},${yFor(v)}`).filter(Boolean).join(" ");
+      let lastIdx = vals.length - 1; while (lastIdx >= 0 && isNaN(vals[lastIdx])) lastIdx--;
+      const lastX = lastIdx >= 0 ? xFor(lastIdx) : 0;
+      const lastY = lastIdx >= 0 ? yFor(vals[lastIdx]) : h / 2;
+      return `
+    <svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" class="spark-inline" aria-hidden="true">
+      ${polyT ? `<polyline points="${polyT}" fill="none" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="2,2"/>` : ""}
+      ${polyV ? `<polyline points="${polyV}" fill="none" stroke="#333333" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
+      ${lastIdx >= 0 ? `<circle cx="${lastX}" cy="${lastY}" r="2.2" fill="#111111"/>` : ""}
+    </svg>`;
+    }
+
+    /* =================================================================
+       RENDER STATE
+       ================================================================= */
+    const STATUS_LABEL = { ontrack: "On track", watch: "Watch", off: "Off track" };
+    const TIER_META = {
+      northStar: { label: "North Star", cadence: "Weekly" },
+      secondary: { label: "Secondary", cadence: "Monthly" },
+      tertiary: { label: "Tertiary", cadence: "Quarterly" },
+    };
+    const RANGE_DEFAULTS = { Weekly: 4, Monthly: 6, Quarterly: 99 };
+
+    /* The teams shown as tiles on the landing page. Add a person to a team by
+       setting their `dept` to one of these (or extend this list). */
+    const DEPARTMENTS = ["Ops", "Social Media", "Marketplace", "Shopify", "CRM", "Designer/Inventory"];
+
+    let PEOPLE = [];
+    let screen = "tiles";      // "tiles" | "board"
+    let selectedTeam = "All";  // "All" or a department name
+    let currentTier = "all";
+    let currentRange = "auto";
+    let asOfDate = "";
+    let latestAvailable = "";
+
+    function periodLabel(iso, cadence) {
+      if (!iso) return "";
+      const d = new Date(iso + "T00:00:00");
+      if (isNaN(d)) return iso;
+      if (cadence === "Weekly") return `Week of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+      if (cadence === "Monthly") return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      if (cadence === "Quarterly") { const q = Math.floor(d.getMonth() / 3) + 1; return `Q${q} ${d.getFullYear()}`; }
+      return iso;
+    }
+    function periodShort(iso, cadence) {
+      if (!iso) return "";
+      const d = new Date(iso + "T00:00:00");
+      if (isNaN(d)) return iso;
+      if (cadence === "Weekly") return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      if (cadence === "Monthly") return d.toLocaleDateString("en-US", { month: "short" }) + " '" + d.getFullYear().toString().slice(2);
+      if (cadence === "Quarterly") { const q = Math.floor(d.getMonth() / 3) + 1; return `Q${q} '${d.getFullYear().toString().slice(2)}`; }
+      return iso;
+    }
+    function rangeFor(cadence) {
+      if (currentRange === "auto") return RANGE_DEFAULTS[cadence];
+      if (currentRange === "all") return 999;
+      return parseInt(currentRange, 10);
+    }
+
+    /* Build the period columns shown for a person's tier (oldest→newest). */
+    function periodColumns(person, tierKey) {
+      const cadence = TIER_META[tierKey].cadence;
+      const set = new Set();
+      (person[tierKey] || []).forEach(k =>
+        (k.history || []).forEach(h => set.add(normalizePeriod(h.period, cadence))));
+      const edge = normalizePeriod(asOfDate, cadence);
+      let arr = [...set].filter(p => p <= edge).sort();
+      const n = rangeFor(cadence);
+      if (arr.length > n) arr = arr.slice(-n);
+      return arr;
+    }
+
+    /* The rollup column header for a cadence. */
+    function rollupHeader(cadence) {
+      if (cadence === "Weekly") return "Month";
+      if (cadence === "Monthly") return "Quarter";
+      if (cadence === "Quarterly") return "Year";
+      return "Total";
+    }
+    function changeHeader(cadence) {
+      if (cadence === "Weekly") return "vs last week";
+      if (cadence === "Monthly") return "vs last month";
+      if (cadence === "Quarterly") return "vs last quarter";
+      return "vs prev";
+    }
+    /* How to roll the visible cells into the summary column.
+       Default: weekly counts/amounts → sum; monthly & quarterly → avg.
+       Per-KPI `roll` override ('sum' | 'avg' | 'last') for rates & stock metrics. */
+    function rollupType(kpi, cadence) {
+      if (kpi.roll) return kpi.roll;
+      return cadence === "Weekly" ? "sum" : "avg";
+    }
+    function rollup(cells, roll) {
+      const vals = cells.filter(c => c && !isNaN(num(c.actual)));
+      if (!vals.length) return null;
+      const tg = vals.filter(c => !isNaN(num(c.target)));
+      const agg = (arr, key) => {
+        const ns = arr.map(c => num(c[key]));
+        if (roll === "sum") return ns.reduce((a, b) => a + b, 0);
+        if (roll === "last") return ns[ns.length - 1];
+        return ns.reduce((a, b) => a + b, 0) / ns.length; // avg
+      };
+      return { actual: agg(vals, 'actual'), target: tg.length ? agg(tg, 'target') : null };
+    }
+    function fmtAgg(v, sample) {
+      if (v === null || isNaN(v)) return "—";
+      const s = String(sample || "");
+      const body = Math.abs(v) >= 100 ? v.toFixed(0)
+        : Math.abs(v) >= 10 ? v.toFixed(1)
+          : v.toFixed(2).replace(/\.?0+$/, "");
+      if (s.includes("₹")) return `₹${body}${unitSuffix(s)}`;
+      if (s.includes("%")) return `${body}%`;
+      if (s.includes("x")) return `${body}x`;
+      return `${body}${unitSuffix(s)}`;
+    }
+
+    /* Simplify status: watch → off (only green/red). */
+    function effectiveStatus(s) {
+      if (s === "watch") return "off";
+      return s;
+    }
+
+    /* One <tr> per KPI — Excel-style with separate Target / Actual columns. */
+    function kpiRow(kpi, cols, cadence) {
+      const cells = cols.map(p => rowAtPeriod(kpi.history, p, cadence));
+      const lastWithData = [...cells].reverse().find(Boolean);
+      const rawStatus = lastWithData ? lastWithData.status : "not-updated";
+      const status = effectiveStatus(rawStatus);
+      const sampleVal = lastWithData ? lastWithData.actual : "";
+
+      // Each week = 2 cells (Target, Actual)
+      const cellsHTML = cells.map((c, i) => {
+        const isNow = i === cells.length - 1;
+        const nowCls = isNow ? " col-now" : "";
+        if (!c) {
+          return `<td class="cell-target-val week-start${nowCls}">—</td>
+              <td class="cell-empty-val${nowCls}">—</td>`;
+        }
+        const st = effectiveStatus(c.status);
+        return `<td class="cell-target-val week-start${nowCls}">${c.target}</td>
+            <td class="cell-actual-val s-${st}${nowCls}">${c.actual}</td>`;
+      }).join("");
+
+      // Total month rollup — Target | Actual
+      const agg = rollup(cells, rollupType(kpi, cadence));
+      let totalHTML;
+      if (agg) {
+        totalHTML = `<td class="cell-target-val total-col">${agg.target === null ? "—" : fmtAgg(agg.target, sampleVal)}</td>
+                <td class="cell-actual-val total-col">${fmtAgg(agg.actual, sampleVal)}</td>`;
+      } else {
+        totalHTML = `<td class="cell-target-val total-col">—</td><td class="cell-empty-val total-col">—</td>`;
+      }
+
+      // VS last week — show previous value + delta
+      const dataIdx = cells.map((c, i) => (c && !isNaN(num(c.actual))) ? i : -1).filter(i => i >= 0);
+      const prior = vsPrior(cells, kpi.goal_dir);
+      let vsHTML;
+      if (prior && dataIdx.length >= 2) {
+        const prevCell = cells[dataIdx[dataIdx.length - 2]];
+        const prevVal = prevCell ? prevCell.actual : "—";
+        const arrow = prior.text.startsWith("+") ? "▲" : prior.text.startsWith("−") ? "▼" : "—";
+        const cls = prior.direction === "up" ? "change-up" : prior.direction === "down" ? "change-down" : "change-flat";
+        vsHTML = `<td class="vs-col vs-cell">
+      <span class="vs-prev">Last: ${prevVal}</span>
+      <span class="vs-delta ${cls}">${arrow} ${prior.text}</span>
+    </td>`;
+      } else {
+        vsHTML = `<td class="vs-col vs-cell"><span class="vs-delta change-flat">—</span></td>`;
+      }
+
+      // Total columns count: 1 (kpi) + cols*2 (target+actual per week) + 2 (total target+actual) + 1 (vs)
+      const totalColCount = 1 + cols.length * 2 + 2 + 1;
+      const note = lastWithData && lastWithData.notes
+        ? `<tr class="kpi-notes-row"><td colspan="${totalColCount}">${lastWithData.notes}</td></tr>` : "";
+
+      return `
+    <tr>
+      <td class="kpi-col"><span class="dot ${status}" title="${STATUS_LABEL[status] || 'Not updated'}"></span>${kpi.name}</td>
+      ${cellsHTML}
+      ${totalHTML}
+      ${vsHTML}
+    </tr>
+    ${note}`;
+    }
+
+    function tierTable(person, tierKey) {
+      const meta = TIER_META[tierKey];
+      const list = person[tierKey] || [];
+      if (!list.length) return "";
+      const cols = periodColumns(person, tierKey);
+      if (!cols.length) {
+        return `
+      <div class="tier">
+        <div class="tier-label">${meta.label} <span class="cadence">${meta.cadence}</span></div>
+        <div class="empty" style="text-align:left;padding:8px 0">No data in the selected time range.</div>
+      </div>`;
+      }
+      const windowLabel = `${periodShort(cols[0], meta.cadence)} → ${periodShort(cols[cols.length - 1], meta.cadence)}`;
+
+      // Top header row: KPI name | Week 1 (colspan=2) | Week 2 ... | Total Month (colspan=2) | VS Last
+      const weekHeaders = cols.map((p, i) => {
+        const isNow = i === cols.length - 1;
+        const label = meta.cadence === "Weekly" ? `Week ${i + 1}` : periodShort(p, meta.cadence);
+        return `<th colspan="2" class="week-start${isNow ? ' col-now' : ''}">${label}</th>`;
+      }).join("");
+
+      // Sub-header row: (empty for KPI col) | Target | Actual | Target | Actual ... | Target | Actual | (vs)
+      const subHeaders = cols.map((_, i) => {
+        const isNow = i === cols.length - 1;
+        const nowCls = isNow ? " col-now" : "";
+        return `<th class="sub-target week-start${nowCls}">Target</th><th class="sub-actual${nowCls}">Actual</th>`;
+      }).join("");
+
+      return `
+    <div class="tier">
+      <div class="tier-label">
+        ${meta.label} <span class="cadence">${meta.cadence}</span>
+        <span class="period-tag">· ${windowLabel}</span>
+      </div>
+      <div class="kpi-table-wrap">
+        <table class="kpi-table">
+          <thead>
+            <tr class="week-row">
+              <th class="kpi-col" rowspan="2">KPI / Metric</th>
+              ${weekHeaders}
+              <th class="total-col" colspan="2">${rollupHeader(meta.cadence)} Total</th>
+              <th class="vs-col" rowspan="2">${changeHeader(meta.cadence)}</th>
+            </tr>
+            <tr class="sub-row">
+              ${subHeaders}
+              <th class="sub-target total-col">Target</th>
+              <th class="sub-actual total-col">Actual</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(k => kpiRow(k, cols, meta.cadence)).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+    }
+
+    function tiersForFilter() {
+      return currentTier === "all" ? ["northStar", "secondary", "tertiary"] : [currentTier];
+    }
+    function personBlockInner(p) {
+      return tiersForFilter().map(t => tierTable(p, t)).join("");
+    }
+    function personCard(p) {
+      return `
+    <div class="card">
+      <h3>${p.name}</h3>
+      <div class="role">${p.role} · ${p.dept}</div>
+      ${personBlockInner(p)}
+    </div>`;
+    }
+    /* People for a given team key ("All" = everyone). */
+    function teamPeople(team) {
+      return PEOPLE.filter(p => team === "All" ? true : p.dept === team);
+    }
+
+    /* Count North Star statuses — watch merged into off (only green/red). */
+    function statusCounts(people) {
+      const c = { ontrack: 0, off: 0, notupdated: 0 };
+      const exp = normalizePeriod(asOfDate, "Weekly");
+      people.forEach(p => (p.northStar || []).forEach(k => {
+        const row = rowAtPeriod(k.history, exp, "Weekly");
+        if (!row) c.notupdated++;
+        else if (row.status === "ontrack") c.ontrack++;
+        else c.off++; // watch + off both count as off
+      }));
+      return c;
+    }
+    /* On-track / off-track chips (green/red only). */
+    function statChips(c) {
+      return [
+        `<span class="stat-chip ok"><span class="dot ontrack"></span>${c.ontrack} on track</span>`,
+        `<span class="stat-chip bad"><span class="dot off"></span>${c.off} off track</span>`,
+        c.notupdated ? `<span class="stat-chip na"><span class="dot not-updated"></span>${c.notupdated} not updated</span>` : "",
+      ].join("");
+    }
+    /* Big hero tiles for the board overview — green/red only. */
+    function heroOverviewHTML(c) {
+      const tiles = [
+        `<div class="hero-tile ok">
+      <div class="hero-dot"></div>
+      <div class="hero-count">${c.ontrack}</div>
+      <div class="hero-label">On Track</div>
+    </div>`,
+        `<div class="hero-tile bad">
+      <div class="hero-dot"></div>
+      <div class="hero-count">${c.off}</div>
+      <div class="hero-label">Off Track</div>
+    </div>`,
+      ];
+      if (c.notupdated) {
+        tiles.push(`<div class="hero-tile neutral">
+      <div class="hero-dot"></div>
+      <div class="hero-count">${c.notupdated}</div>
+      <div class="hero-label">Not Updated</div>
+    </div>`);
+      }
+      return tiles.join("");
+    }
+
+    /* ---- Landing page: clickable department tiles ---- */
+    function renderTiles() {
+      const tiles = [{ key: "All", label: "All Teams", sub: "Everyone's KRA / KPIs", all: true }]
+        .concat(DEPARTMENTS.map(d => ({ key: d, label: d, sub: "Team board" })));
+      const html = tiles.map(t => {
+        const ppl = teamPeople(t.key);
+        const count = ppl.length;
+        const stats = count
+          ? `<div class="tile-stats">${statChips(statusCounts(ppl))}</div>`
+          : "";
+        return `
+      <button class="tile ${t.all ? "all" : ""}" data-team="${t.key}">
+        <div class="tile-name">${t.label}</div>
+        <div class="tile-sub">${t.sub}</div>
+        <div class="tile-foot">
+          <span class="tile-count">${count} ${count === 1 ? "person" : "people"}</span>
+          ${count ? "" : `<span class="tile-empty">Not set up yet</span>`}
+        </div>
+        ${stats}
+      </button>`;
+      }).join("");
+      document.getElementById("tileGrid").innerHTML = html;
+      document.querySelectorAll(".tile").forEach(el =>
+        el.addEventListener("click", () => openTeam(el.dataset.team)));
+    }
+
+    function showScreen(s) {
+      screen = s;
+      document.getElementById("view-tiles").classList.toggle("hidden", s !== "tiles");
+      document.getElementById("view-board").classList.toggle("hidden", s !== "board");
+    }
+    function openTeam(team) {
+      selectedTeam = team;
+      showScreen("board");
+      refreshBoard();
+      window.scrollTo(0, 0);
+    }
+
+    /* ---- Team board ---- */
+    function renderBoard() {
+      document.getElementById("boardTitle").textContent =
+        selectedTeam === "All" ? "All Teams" : selectedTeam;
+      const ppl = teamPeople(selectedTeam);
+      const counts = ppl.length ? statusCounts(ppl) : null;
+      document.getElementById("heroOverview").innerHTML = counts ? heroOverviewHTML(counts) : "";
+      document.getElementById("boardSummary").innerHTML = "";
+      let html;
+      if (!ppl.length) {
+        html = `<div class="card empty">No team members added to ${selectedTeam} yet.</div>`;
+      } else if (selectedTeam === "All") {
+        const groups = {};
+        ppl.forEach(p => { (groups[p.dept] = groups[p.dept] || []).push(p); });
+        const order = [...DEPARTMENTS, ...Object.keys(groups).filter(d => !DEPARTMENTS.includes(d))];
+        html = order.filter(d => groups[d]).map(d =>
+          `<div class="board-group-label">${d}</div>` + groups[d].map(personCard).join("")).join("");
+      } else {
+        html = ppl.map(personCard).join("");
+      }
+      document.getElementById("boardContent").innerHTML = html;
+    }
+
+    function deptHealth(people) {
+      let counts = { ontrack: 0, watch: 0, off: 0, notupdated: 0 };
+      const expected = normalizePeriod(asOfDate, "Weekly");
+      people.forEach(p => (p.northStar || []).forEach(k => {
+        const row = rowAtPeriod(k.history, expected, "Weekly");
+        if (!row) counts.notupdated++; else counts[row.status]++;
+      }));
+      const totalReported = counts.ontrack + counts.watch + counts.off;
+      if (counts.off > 0) return { label: `${counts.off} off track`, dot: "off" };
+      if (counts.notupdated > 0) return { label: `${counts.notupdated} not updated`, dot: "not-updated" };
+      if (counts.watch > counts.ontrack) return { label: `${counts.watch} on watch`, dot: "watch" };
+      return { label: `${counts.ontrack} / ${totalReported} on track`, dot: "ontrack" };
+    }
+    /* ---- Stamp + time-travel banner ---- */
+    function renderTopStamp() {
+      const monday = mondayOf(asOfDate);
+      const sunday = new Date(monday + "T00:00:00"); sunday.setDate(sunday.getDate() + 6);
+      const stamp = `Week of ${new Date(monday + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${sunday.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+      document.getElementById("weekStamp").textContent = stamp;
+      const banner = document.getElementById("timewarp");
+      if (asOfDate === latestAvailable) banner.classList.remove("visible");
+      else {
+        banner.classList.add("visible");
+        document.getElementById("timewarpLabel").textContent =
+          `Showing ${periodLabel(mondayOf(asOfDate), "Weekly")} (latest available: ${periodLabel(latestAvailable, "Weekly")})`;
+      }
+    }
+    function renderAppliedFilters() {
+      const parts = [];
+      parts.push(`As of: ${periodLabel(mondayOf(asOfDate), "Weekly")}`);
+      parts.push(currentRange === "auto" ? "default range" : currentRange === "all" ? "all time" : `last ${currentRange} periods`);
+      parts.push(currentTier === "all" ? "all KPI tiers" : TIER_META[currentTier].label + " only");
+      document.getElementById("appliedFilters").innerHTML = "Showing: " + parts.join(" · ");
+    }
+
+    /* Re-draw the board (used on every in-board control change). */
+    function refreshBoard() {
+      renderTopStamp();
+      renderBoard();
+      renderAppliedFilters();
+    }
+    /* Full re-render: refresh tile health, and the board if it's open. */
+    function rerender() {
+      renderTopStamp();
+      renderTiles();
+      if (screen === "board") { renderBoard(); renderAppliedFilters(); }
+    }
+
+    function availableWeeklyPeriods(people) {
+      const periods = new Set();
+      people.forEach(p => (p.northStar || []).forEach(k =>
+        (k.history || []).forEach(h => periods.add(mondayOf(h.period)))));
+      return Array.from(periods).sort().reverse();
+    }
+
+    /* ---- Theme (light / dark) ---- */
+    function applyTheme(t) {
+      document.documentElement.setAttribute("data-theme", t);
+      const btn = document.getElementById("themeToggle");
+      if (btn) btn.textContent = t === "dark" ? "☀ Light mode" : "🌙 Dark mode";
+      try { localStorage.setItem("napchief-theme", t); } catch (e) { }
+    }
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      applyTheme(next);
+    });
+    (function initTheme() {
+      let t = "light";
+      try { t = localStorage.getItem("napchief-theme") || "light"; } catch (e) { }
+      applyTheme(t);
+    })();
+
+    /* ---- Wire controls ---- */
+    document.getElementById("brandLogo").addEventListener("click", () => {
+      showScreen("tiles"); renderTiles(); window.scrollTo(0, 0);
+    });
+    document.getElementById("backBtn").addEventListener("click", () => {
+      showScreen("tiles"); renderTiles(); window.scrollTo(0, 0);
+    });
+    document.querySelectorAll("#tierPills .pill").forEach(p => p.addEventListener("click", () => {
+      document.querySelectorAll("#tierPills .pill").forEach(x => x.classList.remove("active"));
+      p.classList.add("active"); currentTier = p.dataset.tier; refreshBoard();
+    }));
+    document.getElementById("asOfDate").addEventListener("change", e => { asOfDate = e.target.value; refreshBoard(); });
+    document.getElementById("rangeFilter").addEventListener("change", e => { currentRange = e.target.value; refreshBoard(); });
+    document.getElementById("timewarpReset").addEventListener("click", () => {
+      asOfDate = latestAvailable; document.getElementById("asOfDate").value = asOfDate; refreshBoard();
+    });
+
+    /* Rebuild the as-of week dropdown from the loaded data, keeping the current
+       selection if it still exists (otherwise snap to the latest week). */
+    function rebuildPeriodControls() {
+      const periods = availableWeeklyPeriods(PEOPLE);
+      latestAvailable = periods[0] || new Date().toISOString().slice(0, 10);
+      if (!asOfDate || !periods.includes(asOfDate)) asOfDate = latestAvailable;
+      const sel = document.getElementById("asOfDate");
+      sel.innerHTML = periods.map((p, i) =>
+        `<option value="${p}"${p === asOfDate ? " selected" : ""}>${periodLabel(p, "Weekly")}${i === 0 ? " (latest)" : ""}</option>`).join("");
+    }
+    function stampUpdated() {
+      document.getElementById("lastUpdated").textContent = new Date().toLocaleString("en-US",
+        { weekday: "short", hour: "numeric", minute: "2-digit" });
+    }
+
+    /* Pull data (mock or live CSV) and redraw whatever is on screen. */
+    async function loadAndRender(forceRefresh = false) {
+      PEOPLE = await loadData(forceRefresh);
+      rebuildPeriodControls();
+      if (forceRefresh || !localStorage.getItem("napchief-kpis-cache-time")) {
+        stampUpdated();
+      }
+      renderTopStamp();
+      renderTiles();
+      if (screen === "board") { renderBoard(); renderAppliedFilters(); }
+    }
+
+    /* ---- Refresh button: re-fetch the latest live data on demand ---- */
+    document.getElementById("refreshBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("refreshBtn");
+      const label = btn.textContent;
+      btn.disabled = true; btn.textContent = "⟳ Refreshing…";
+      try {
+        await loadAndRender(true);
+      } finally {
+        btn.disabled = false; btn.textContent = label;
+      }
+    });
+
+    (async function init() {
+      await loadAndRender(false);
+      showScreen("tiles");
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "napchief-kpi-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Nap Chief KPI Dashboard (v5, per-period table view)",
+  "scripts": {
+    "dev": "vite --open /napchief-kpi-dashboard.html",
+    "build": "vite build",
+    "preview": "vite preview --open /napchief-kpi-dashboard.html"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}

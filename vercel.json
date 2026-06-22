@@ -1,0 +1,7 @@
+{
+  "buildCommand": "echo no build",
+  "outputDirectory": ".",
+  "rewrites": [
+    { "source": "/", "destination": "/napchief-kpi-dashboard.html" }
+  ]
+}
