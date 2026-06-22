@@ -1177,6 +1177,9 @@
     .login-btn:hover { opacity: 0.9; }
     .login-error { color: var(--off); font-size: 12.5px; min-height: 16px; }
     .whoami { font-size: 12px; color: var(--ink-3); align-self: center; }
+    /* Clickable person name → opens their sheet (text looks unchanged) */
+    .person-link { color: inherit; text-decoration: none; cursor: pointer; }
+    .person-link:hover { text-decoration: underline; text-underline-offset: 3px; }
   </style>
 </head>
 
@@ -2076,9 +2079,13 @@
       return tiersForFilter().map(t => tierTable(p, t)).join("");
     }
     function personCard(p) {
+      const src = SHEET_SOURCES.find(s => s.person === p.name);
+      const nameHtml = src
+        ? `<a class="person-link" href="https://docs.google.com/spreadsheets/d/${src.id}/edit" target="_blank" rel="noopener" title="Open ${p.name}'s sheet">${p.name}</a>`
+        : p.name;
       return `
     <div class="card">
-      <h3>${p.name}</h3>
+      <h3>${nameHtml}</h3>
       <div class="role">${p.role} · ${p.dept}</div>
       ${personBlockInner(p)}
     </div>`;
