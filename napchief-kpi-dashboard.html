@@ -1899,6 +1899,21 @@
       let arr = [...set].filter(p => p <= edge).sort();
       const n = rangeFor(cadence);
       if (arr.length > n) arr = arr.slice(-n);
+
+      // If no data exists yet, generate default columns for the current period
+      // so the table structure still renders with — dashes instead of disappearing.
+      if (!arr.length && (person[tierKey] || []).length) {
+        const ref = new Date(asOfDate + "T00:00:00");
+        if (cadence === "Weekly") {
+          arr = mondaysOfMonth(ref.getFullYear(), ref.getMonth());
+        } else if (cadence === "Monthly") {
+          const q = Math.floor(ref.getMonth() / 3);
+          arr = quarterMonths(q + 1).map(m => firstOfMonthDate(ref.getFullYear(), m));
+        } else {
+          arr = [1, 2, 3, 4].map(q => firstOfQuarterDate(ref.getFullYear(), q));
+        }
+      }
+
       return arr;
     }
 
