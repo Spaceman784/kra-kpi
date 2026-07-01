@@ -2115,7 +2115,8 @@
       const c = { ontrack: 0, off: 0, notupdated: 0 };
       const exp = normalizePeriod(asOfDate, "Weekly");
       people.forEach(p => (p.northStar || []).forEach(k => {
-        const row = rowAtPeriod(k.history, exp, "Weekly");
+        // Judge by the KPI's latest entered week (≤ as-of), not the exact current week.
+        const row = latestAtOrBefore(k.history, exp, "Weekly");
         if (!row) c.notupdated++;
         else if (row.status === "ontrack") c.ontrack++;
         else c.off++; // watch + off both count as off
