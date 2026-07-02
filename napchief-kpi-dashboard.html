@@ -1698,13 +1698,19 @@
       return { rows, catalog };
     }
 
+    /* Cache auto-expires after this long — everyone lands on data no staler
+       than CACHE_TTL_MS old, without needing a manual Refresh click. */
+    const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
     async function loadData(forceRefresh = false) {
       if (DATA_SOURCE.mode === "liveSheets") {
         if (!forceRefresh) {
           try {
             const cached = localStorage.getItem("napchief-kpis-cache");
             const cachedTime = localStorage.getItem("napchief-kpis-cache-time");
-            if (cached) {
+            const cachedTs = parseInt(localStorage.getItem("napchief-kpis-cache-ts") || "0", 10);
+            const isFresh = cachedTs && (Date.now() - cachedTs) < CACHE_TTL_MS;
+            if (cached && isFresh) {
               const people = JSON.parse(cached);
               document.getElementById("sourcePill").textContent = "Source: Google Sheets (cached)";
               if (cachedTime) {
@@ -1729,6 +1735,7 @@
               localStorage.setItem("napchief-kpis-cache", JSON.stringify(people));
               const nowStr = new Date().toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
               localStorage.setItem("napchief-kpis-cache-time", nowStr);
+              localStorage.setItem("napchief-kpis-cache-ts", String(Date.now()));
             } catch (err) {
               console.warn("Error saving to cache:", err);
             }
