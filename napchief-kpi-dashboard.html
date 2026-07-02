@@ -1664,12 +1664,12 @@
         const altRow = !tier && /^(weekly|monthly|quarterly)$/i.test((r[1] || "").trim());
         const isTierRow = /^T[123]$/.test(tier);
         if (isTierRow) sawTierInBlock = true;
-        // Nested sub-metrics (e.g. "ROAS", "New Customers" under a combined parent KPI)
-        // have a blank Tier/Cadence but a real Roll-up + KPI name — treat them as their
-        // own KPI belonging to the last Tier row seen, instead of skipping them.
-        const childRow = !tier && !altRow && sawTierInBlock && (r[3] || "").trim() !== "" && (r[2] || "").trim() !== "";
-        if (!isTierRow && !altRow && !childRow) continue;
         const kpi = (r[2] || "").trim();
+        // Nested sub-metrics (e.g. "ROAS", "New Customers" under a combined parent KPI)
+        // have a blank Tier/Cadence but a real KPI name — treat them as their own KPI
+        // belonging to the last Tier row seen, instead of skipping them.
+        const childRow = !tier && !altRow && sawTierInBlock && kpi !== "";
+        if (!isTierRow && !altRow && !childRow) continue;
         if (!kpi) continue;
         const seen = nameOccurrence.get(kpi) || 0;
         nameOccurrence.set(kpi, seen + 1);
@@ -2089,10 +2089,12 @@
         "https://docs.google.com/spreadsheets/d/1TWZcYmOs--Ff0X0MYK7NJPNE0w1o16g1v_UeGsVSaOs/edit?usp=sharing",
       "Sheetal S.::Video Ads Given vs Scaled at ₹40k+ (Volume vs Quality)":
         "https://docs.google.com/spreadsheets/d/1fmYr2Kucwc7JTVfodXLKzxmt_7QH-_9Ca7XeL6tpHfA/edit?usp=sharing",
-      "Sheetal S.::Target Achieved: ROAS, New Customers & Collection Movement via Content": [
-        { label: "ROAS & New Customers", url: "https://docs.google.com/spreadsheets/d/1UuaZOFisjqjnht-qRMa07sbZjuAZCHbCCEkYHB8_QDo/edit?usp=sharing" },
-        { label: "Collection Movement vs Content", url: "https://docs.google.com/spreadsheets/d/1V9CZ1Gm8-3k2HHd1fK0UL5N-snRLE34pH_YtMjapIZo/edit?usp=sharing" },
-      ],
+      "Sheetal S.::ROAS":
+        "https://docs.google.com/spreadsheets/d/1UuaZOFisjqjnht-qRMa07sbZjuAZCHbCCEkYHB8_QDo/edit?usp=sharing",
+      "Sheetal S.::New Customers":
+        "https://docs.google.com/spreadsheets/d/1UuaZOFisjqjnht-qRMa07sbZjuAZCHbCCEkYHB8_QDo/edit?usp=sharing",
+      "Sheetal S.::Collection Movement via Content":
+        "https://docs.google.com/spreadsheets/d/1V9CZ1Gm8-3k2HHd1fK0UL5N-snRLE34pH_YtMjapIZo/edit?usp=sharing",
       "Sheetal S.::% Spend on Proven vs New Creative Formats (70/30 target)":
         "https://docs.google.com/spreadsheets/d/1-BMBoG5q6CEptRaX9Xcn5hyKYEY6A2FxxeGJWT72-bg/edit?gid=0#gid=0",
       "Sheetal S.::Lifespan of a Winning Creative (Days before ROAS drop)":
@@ -2165,9 +2167,15 @@
     ${note}`;
     }
 
+    /* KPI rows to hide entirely, keyed by "Person::KPI Name" — used for leftover
+       parent/header rows whose sub-metrics now render as their own separate rows. */
+    const HIDDEN_KPIS = new Set([
+      "Sheetal S.::Target Achieved: ROAS, New Customers & Collection Movement via Content",
+    ]);
+
     function tierTable(person, tierKey) {
       const meta = TIER_META[tierKey];
-      const list = person[tierKey] || [];
+      const list = (person[tierKey] || []).filter(k => !HIDDEN_KPIS.has(`${person.name}::${k.name}`));
       if (!list.length) return "";
       const cols = periodColumns(person, tierKey);
       if (!cols.length) {
