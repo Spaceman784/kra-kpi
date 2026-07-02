@@ -1250,11 +1250,11 @@
       <div class="board-summary" id="boardSummary" style="margin-bottom:16px;"></div>
       <div class="controls">
         <div class="filters">
-          <div class="filter-group">
-            <span>As of:</span>
+          <div class="filter-group" id="periodGroup">
+            <span id="periodLabel">Month:</span>
             <select id="asOfDate"></select>
           </div>
-          <div class="filter-group">
+          <div class="filter-group" id="rangeGroup" style="display:none;">
             <span>Time range:</span>
             <select id="rangeFilter">
               <option value="auto" selected>Default per cadence</option>
@@ -1637,8 +1637,8 @@
           for (let i = 0; i < 4; i++) emit(mondays[i], r[4 + i * 2], r[5 + i * 2]);
         } else if (cadence === "Monthly") {
           if (curQuarter === null) continue;
-          const months = quarterMonths(curQuarter);
-          for (let i = 0; i < 3; i++) emit(firstOfMonthDate(SHEET_YEAR, months[i]), r[4 + i * 2], r[5 + i * 2]);
+          // June-start fiscal quarters: Q1 = Jun/Jul/Aug, Q2 = Sep/Oct/Nov, etc.
+          for (let i = 0; i < 3; i++) emit(fiscalMonthDate(curQuarter, i), r[4 + i * 2], r[5 + i * 2]);
         } else {
           for (let q = 0; q < 4; q++) emit(firstOfQuarterDate(SHEET_YEAR, q + 1), r[4 + q * 2], r[5 + q * 2]);
         }
@@ -1912,31 +1912,32 @@
     }
 
     /* Build the period columns shown for a person's tier (oldest→newest). */
+    /* June-start fiscal calendar. Month-in-quarter i (0..2), quarter qNum (1..4). */
+    function fiscalMonthDate(qNum, i) {
+      const cal = (5 + (qNum - 1) * 3 + i) % 12;   // 5 = June
+      return firstOfMonthDate(SHEET_YEAR, cal);
+    }
+    /* Which fiscal quarter (1..4) a calendar month index (0=Jan) falls in. */
+    function fiscalQuarterOfMonth(cal) {
+      return Math.floor((((cal - 5) + 12) % 12) / 3) + 1;
+    }
+
+    /* Columns are anchored to the selected period (from the Month/Quarter filter):
+       Weekly  → the 4 weeks of the as-of month
+       Monthly → the 3 months of the as-of fiscal quarter
+       Quarterly → the 4 quarters of the year
+       Data fills where present; empty periods render as — dashes. */
     function periodColumns(person, tierKey) {
       const cadence = TIER_META[tierKey].cadence;
-      const set = new Set();
-      (person[tierKey] || []).forEach(k =>
-        (k.history || []).forEach(h => set.add(normalizePeriod(h.period, cadence))));
-      const edge = normalizePeriod(asOfDate, cadence);
-      let arr = [...set].filter(p => p <= edge).sort();
-      const n = rangeFor(cadence);
-      if (arr.length > n) arr = arr.slice(-n);
-
-      // If no data exists yet, generate default columns for the current period
-      // so the table structure still renders with — dashes instead of disappearing.
-      if (!arr.length && (person[tierKey] || []).length) {
-        const ref = new Date(asOfDate + "T00:00:00");
-        if (cadence === "Weekly") {
-          arr = mondaysOfMonth(ref.getFullYear(), ref.getMonth());
-        } else if (cadence === "Monthly") {
-          const q = Math.floor(ref.getMonth() / 3);
-          arr = quarterMonths(q + 1).map(m => firstOfMonthDate(ref.getFullYear(), m));
-        } else {
-          arr = [1, 2, 3, 4].map(q => firstOfQuarterDate(ref.getFullYear(), q));
-        }
+      const ref = new Date(asOfDate + "T00:00:00");
+      if (cadence === "Weekly") {
+        return mondaysOfMonth(ref.getFullYear(), ref.getMonth());
       }
-
-      return arr;
+      if (cadence === "Monthly") {
+        const q = fiscalQuarterOfMonth(ref.getMonth());
+        return [0, 1, 2].map(i => fiscalMonthDate(q, i));
+      }
+      return [1, 2, 3, 4].map(q => firstOfQuarterDate(SHEET_YEAR, q));
     }
 
     /* The rollup column header for a cadence. */
@@ -2265,22 +2266,16 @@
     }
     /* ---- Stamp + time-travel banner ---- */
     function renderTopStamp() {
-      const monday = mondayOf(asOfDate);
-      const sunday = new Date(monday + "T00:00:00"); sunday.setDate(sunday.getDate() + 6);
-      const stamp = `Week of ${new Date(monday + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${sunday.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
-      document.getElementById("weekStamp").textContent = stamp;
-      const banner = document.getElementById("timewarp");
-      if (asOfDate === latestAvailable) banner.classList.remove("visible");
-      else {
-        banner.classList.add("visible");
-        document.getElementById("timewarpLabel").textContent =
-          `Showing ${periodLabel(mondayOf(asOfDate), "Weekly")} (latest available: ${periodLabel(latestAvailable, "Weekly")})`;
-      }
+      const d = new Date(asOfDate + "T00:00:00");
+      document.getElementById("weekStamp").textContent =
+        d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      document.getElementById("timewarp").classList.remove("visible");
     }
     function renderAppliedFilters() {
+      const d = new Date(asOfDate + "T00:00:00");
       const parts = [];
-      parts.push(`As of: ${periodLabel(mondayOf(asOfDate), "Weekly")}`);
-      parts.push(currentRange === "auto" ? "default range" : currentRange === "all" ? "all time" : `last ${currentRange} periods`);
+      if (currentTier === "secondary") parts.push(`Quarter of ${d.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`);
+      else if (currentTier !== "tertiary") parts.push(`Month: ${d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`);
       parts.push(currentTier === "all" ? "all KPI tiers" : TIER_META[currentTier].label + " only");
       document.getElementById("appliedFilters").innerHTML = "Showing: " + parts.join(" · ");
     }
@@ -2331,9 +2326,9 @@
     });
     document.querySelectorAll("#tierPills .pill").forEach(p => p.addEventListener("click", () => {
       document.querySelectorAll("#tierPills .pill").forEach(x => x.classList.remove("active"));
-      p.classList.add("active"); currentTier = p.dataset.tier; refreshBoard();
+      p.classList.add("active"); currentTier = p.dataset.tier; populatePeriodFilter(); refreshBoard();
     }));
-    document.getElementById("asOfDate").addEventListener("change", e => { asOfDate = e.target.value; refreshBoard(); });
+    document.getElementById("asOfDate").addEventListener("change", e => { asOfDate = e.target.value || currentMonthDate(); refreshBoard(); });
     document.getElementById("rangeFilter").addEventListener("change", e => { currentRange = e.target.value; refreshBoard(); });
     document.getElementById("boardSearch").addEventListener("input", e => { boardSearch = e.target.value; renderBoard(); });
     document.getElementById("timewarpReset").addEventListener("click", () => {
@@ -2342,13 +2337,54 @@
 
     /* Rebuild the as-of week dropdown from the loaded data, keeping the current
        selection if it still exists (otherwise snap to the latest week). */
-    function rebuildPeriodControls() {
-      const periods = availableWeeklyPeriods(PEOPLE);
-      latestAvailable = periods[0] || new Date().toISOString().slice(0, 10);
-      if (!asOfDate || !periods.includes(asOfDate)) asOfDate = latestAvailable;
+    /* First-of-month date for the real current month (used by the "Current" option). */
+    function currentMonthDate() {
+      const n = new Date();
+      return firstOfMonthDate(n.getFullYear(), n.getMonth());
+    }
+    /* The latest month that has any North Star data (default view). */
+    function dataMonths() {
+      const set = new Set();
+      PEOPLE.forEach(p => (p.northStar || []).forEach(k => (k.history || []).forEach(h => {
+        const d = new Date(h.period + "T00:00:00");
+        set.add(firstOfMonthDate(d.getFullYear(), d.getMonth()));
+      })));
+      return [...set].sort();
+    }
+    /* Fill the period dropdown based on the selected tier:
+       North Star / All → months (Jun→May, fiscal order); Secondary → quarters; Tertiary → hidden. */
+    function populatePeriodFilter() {
+      const grp = document.getElementById("periodGroup");
+      const lbl = document.getElementById("periodLabel");
       const sel = document.getElementById("asOfDate");
-      sel.innerHTML = periods.map((p, i) =>
-        `<option value="${p}"${p === asOfDate ? " selected" : ""}>${periodLabel(p, "Weekly")}${i === 0 ? " (latest)" : ""}</option>`).join("");
+      if (currentTier === "tertiary") { grp.style.display = "none"; return; }
+      grp.style.display = "";
+      const ref = new Date(asOfDate + "T00:00:00");
+      if (currentTier === "secondary") {
+        lbl.textContent = "Quarter:";
+        const labels = ["Q1 (Jun–Aug)", "Q2 (Sep–Nov)", "Q3 (Dec–Feb)", "Q4 (Mar–May)"];
+        const selq = fiscalQuarterOfMonth(ref.getMonth());
+        sel.innerHTML = `<option value="">Current quarter</option>` +
+          [1, 2, 3, 4].map((q, i) =>
+            `<option value="${fiscalMonthDate(q, 0)}"${q === selq ? " selected" : ""}>${labels[i]}</option>`).join("");
+      } else {
+        lbl.textContent = "Month:";
+        const asofM = firstOfMonthDate(ref.getFullYear(), ref.getMonth());
+        let opts = `<option value="">Current month</option>`;
+        for (let i = 0; i < 12; i++) {
+          const cal = (5 + i) % 12;                       // fiscal order: Jun … May
+          const v = firstOfMonthDate(SHEET_YEAR, cal);
+          const label = new Date(v + "T00:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
+          opts += `<option value="${v}"${v === asofM ? " selected" : ""}>${label}</option>`;
+        }
+        sel.innerHTML = opts;
+      }
+    }
+    function rebuildPeriodControls() {
+      const months = dataMonths();
+      latestAvailable = months.length ? months[months.length - 1] : currentMonthDate();
+      if (!asOfDate) asOfDate = latestAvailable;
+      populatePeriodFilter();
     }
     function stampUpdated() {
       document.getElementById("lastUpdated").textContent = new Date().toLocaleString("en-US",
