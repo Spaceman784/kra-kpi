@@ -1661,13 +1661,18 @@
         const gd = goalDirFor(kpi);
         const roll = ({ sum: "sum", avg: "avg", average: "avg", last: "last" })[(r[3] || "").trim().toLowerCase()];
         catalog.push({ person: src.person, role: src.role, dept: src.dept, tierKey, kpi_name: kpi, goal_dir: gd, roll });
+        // Comments column sits 4 columns after the last period's Actual column
+        // (Quarter/Month/Year Target, Actual, vs Target, Achieved % come first).
+        const periodCount = cadence === "Monthly" ? 3 : 4;
+        const commentsIdx = 4 + periodCount * 2 + 4;
+        const rowNotes = (r[commentsIdx] || "").trim();
         const emit = (period, target, actual) => {
           if (period == null || String(actual).trim() === "") return;
           rows.push({
             person: src.person, role: src.role, dept: src.dept, tier: tierKey,
             kpi_name: kpi, goal_dir: gd, period_start: period,
             target: String(target).trim(), actual: String(actual).trim(),
-            status: statusFor(target, actual, gd), notes: ""
+            status: statusFor(target, actual, gd), notes: rowNotes
           });
         };
         if (cadence === "Weekly") {
