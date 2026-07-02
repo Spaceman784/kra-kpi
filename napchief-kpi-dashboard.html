@@ -2006,6 +2006,16 @@
       return `${body}${unitSuffix(s)}`;
     }
 
+    /* Per-KPI reference sheet links. Add an entry keyed by "Person::KPI Name"
+       to make that KPI's name clickable, opening the linked sheet in a new tab. */
+    const KPI_LINKS = {
+      "Sheetal S.::Winning Video Ads vs Total Delivered (Win Rate %)":
+        "https://docs.google.com/spreadsheets/d/1fmYr2Kucwc7JTVfodXLKzxmt_7QH-_9Ca7XeL6tpHfA/edit?gid=0",
+    };
+    function kpiLinkFor(personName, kpiName) {
+      return KPI_LINKS[`${personName}::${kpiName}`] || null;
+    }
+
     /* Simplify status: watch → off (only green/red). */
     function effectiveStatus(s) {
       if (s === "watch") return "off";
@@ -2013,7 +2023,7 @@
     }
 
     /* One <tr> per KPI — Excel-style with separate Target / Actual columns. */
-    function kpiRow(kpi, cols, cadence) {
+    function kpiRow(kpi, cols, cadence, personName) {
       const cells = cols.map(p => rowAtPeriod(kpi.history, p, cadence));
       const lastWithData = [...cells].reverse().find(Boolean);
       const rawStatus = lastWithData ? lastWithData.status : "not-updated";
@@ -2048,9 +2058,14 @@
       const note = lastWithData && lastWithData.notes
         ? `<tr class="kpi-notes-row"><td colspan="${totalColCount}">${lastWithData.notes}</td></tr>` : "";
 
+      const link = kpiLinkFor(personName, kpi.name);
+      const nameHtml = link
+        ? `<a class="person-link" href="${link}" target="_blank" rel="noopener" title="Open reference sheet">${kpi.name}</a>`
+        : kpi.name;
+
       return `
     <tr>
-      <td class="kpi-col"><span class="dot ${status}" title="${STATUS_LABEL[status] || 'Not updated'}"></span>${kpi.name}</td>
+      <td class="kpi-col"><span class="dot ${status}" title="${STATUS_LABEL[status] || 'Not updated'}"></span>${nameHtml}</td>
       ${cellsHTML}
       ${totalHTML}
     </tr>
@@ -2106,7 +2121,7 @@
             </tr>
           </thead>
           <tbody>
-            ${list.map(k => kpiRow(k, cols, meta.cadence)).join("")}
+            ${list.map(k => kpiRow(k, cols, meta.cadence, person.name)).join("")}
           </tbody>
         </table>
       </div>
