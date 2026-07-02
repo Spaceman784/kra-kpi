@@ -1647,7 +1647,7 @@
       // same quarter/month block (differing only in bold formatting, which CSV strips).
       // Track each name's position within its block so duplicates stay distinct rows
       // instead of merging into one — while still displaying the same visible name.
-      let blockToken = null, nameOccurrence = new Map();
+      let blockToken = null, nameOccurrence = new Map(), sawTierInBlock = false;
       for (const r of grid) {
         const joined = r.join(" ");
         if (cadence === "Weekly") {
@@ -1659,10 +1659,16 @@
           if (m) curQuarter = parseInt(m[1][1], 10);
         }
         const curToken = cadence === "Weekly" ? curMonthIdx : cadence === "Monthly" ? curQuarter : "single";
-        if (curToken !== blockToken) { blockToken = curToken; nameOccurrence = new Map(); }
+        if (curToken !== blockToken) { blockToken = curToken; nameOccurrence = new Map(); sawTierInBlock = false; }
         const tier = (r[0] || "").trim();
         const altRow = !tier && /^(weekly|monthly|quarterly)$/i.test((r[1] || "").trim());
-        if (!/^T[123]$/.test(tier) && !altRow) continue;
+        const isTierRow = /^T[123]$/.test(tier);
+        if (isTierRow) sawTierInBlock = true;
+        // Nested sub-metrics (e.g. "ROAS", "New Customers" under a combined parent KPI)
+        // have a blank Tier/Cadence but a real Roll-up + KPI name — treat them as their
+        // own KPI belonging to the last Tier row seen, instead of skipping them.
+        const childRow = !tier && !altRow && sawTierInBlock && (r[3] || "").trim() !== "" && (r[2] || "").trim() !== "";
+        if (!isTierRow && !altRow && !childRow) continue;
         const kpi = (r[2] || "").trim();
         if (!kpi) continue;
         const seen = nameOccurrence.get(kpi) || 0;
