@@ -2134,15 +2134,26 @@
     }
 
     /* Count North Star statuses — watch merged into off (only green/red). */
+    /* On track / off track by the KPI's TOTAL actual vs target for the shown period
+       (e.g. Month Total): actual ≥ target → on track, actual < target → off track. */
+    function kpiOverallStatus(p, k, tierKey) {
+      const cadence = TIER_META[tierKey].cadence;
+      const cols = periodColumns(p, tierKey);
+      const cells = cols.map(pd => rowAtPeriod(k.history, pd, cadence));
+      const hasActual = cells.some(x => x && String(x.actual).trim() !== "" && !isNaN(num(x.actual)));
+      if (!hasActual) return "not-updated";
+      const agg = rollup(cells, rollupType(k, cadence));
+      const t = agg.target, a = agg.actual;
+      const good = (t === null || isNaN(t)) ? true : (k.goal_dir === "down" ? a <= t : a >= t);
+      return good ? "ontrack" : "off";
+    }
     function statusCounts(people) {
       const c = { ontrack: 0, off: 0, notupdated: 0 };
-      const exp = normalizePeriod(asOfDate, "Weekly");
       people.forEach(p => (p.northStar || []).forEach(k => {
-        // Judge by the KPI's latest entered week (≤ as-of), not the exact current week.
-        const row = latestAtOrBefore(k.history, exp, "Weekly");
-        if (!row) c.notupdated++;
-        else if (row.status === "ontrack") c.ontrack++;
-        else c.off++; // watch + off both count as off
+        const s = kpiOverallStatus(p, k, "northStar");
+        if (s === "not-updated") c.notupdated++;
+        else if (s === "ontrack") c.ontrack++;
+        else c.off++;
       }));
       return c;
     }
