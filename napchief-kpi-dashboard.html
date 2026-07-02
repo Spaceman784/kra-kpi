@@ -1665,6 +1665,21 @@
       return people;
     }
 
+    /* Google Sheets fetches have no built-in timeout — one slow/unreachable sheet
+       would otherwise stall the entire dashboard load. Abort after SHEET_FETCH_TIMEOUT_MS
+       so a single bad sheet can't block everyone else's data from rendering. */
+    const SHEET_FETCH_TIMEOUT_MS = 8000;
+
+    async function fetchWithTimeout(url, ms) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ms);
+      try {
+        return await fetch(url, { cache: "no-store", signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
     async function fetchSheetsRows() {
       const rows = [], catalog = [];
       const tabs = [["northStar", "Weekly"], ["secondary", "Monthly"], ["tertiary", "Quarterly"]];
@@ -1677,7 +1692,7 @@
           const url = `https://docs.google.com/spreadsheets/d/${src.id}/export?format=csv&gid=${gid}`;
           promises.push((async () => {
             try {
-              const res = await fetch(url, { cache: "no-store" });
+              const res = await fetchWithTimeout(url, SHEET_FETCH_TIMEOUT_MS);
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               const grid = csvGrid(await res.text());
               const out = parseTrackerGrid(grid, cadence, src);
