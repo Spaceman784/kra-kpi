@@ -1637,7 +1637,7 @@
           for (let i = 0; i < 4; i++) emit(mondays[i], r[4 + i * 2], r[5 + i * 2]);
         } else if (cadence === "Monthly") {
           if (curQuarter === null) continue;
-          // March-start fiscal quarters: Q1 = Mar/Apr/May, Q2 = Jun/Jul/Aug, etc.
+          // April-start fiscal quarters: Q1 = Apr/May/Jun, Q2 = Jul/Aug/Sep, etc.
           for (let i = 0; i < 3; i++) emit(fiscalMonthDate(curQuarter, i), r[4 + i * 2], r[5 + i * 2]);
         } else {
           for (let q = 0; q < 4; q++) emit(firstOfQuarterDate(SHEET_YEAR, q + 1), r[4 + q * 2], r[5 + q * 2]);
@@ -1919,14 +1919,14 @@
     }
 
     /* Build the period columns shown for a person's tier (oldest→newest). */
-    /* March-start fiscal calendar. Month-in-quarter i (0..2), quarter qNum (1..4). */
+    /* April-start fiscal calendar. Month-in-quarter i (0..2), quarter qNum (1..4). */
     function fiscalMonthDate(qNum, i) {
-      const cal = (2 + (qNum - 1) * 3 + i) % 12;   // 2 = March
+      const cal = (3 + (qNum - 1) * 3 + i) % 12;   // 3 = April
       return firstOfMonthDate(SHEET_YEAR, cal);
     }
     /* Which fiscal quarter (1..4) a calendar month index (0=Jan) falls in. */
     function fiscalQuarterOfMonth(cal) {
-      return Math.floor((((cal - 2) + 12) % 12) / 3) + 1;
+      return Math.floor((((cal - 3) + 12) % 12) / 3) + 1;
     }
 
     /* Columns are anchored to the selected period (from the Month/Quarter filter):
@@ -2362,7 +2362,7 @@
       const ref = new Date(asOfDate + "T00:00:00");
       if (currentTier === "secondary") {
         lbl.textContent = "Quarter:";
-        const labels = ["Q1 (Mar–May)", "Q2 (Jun–Aug)", "Q3 (Sep–Nov)", "Q4 (Dec–Feb)"];
+        const labels = ["Q1 (Apr–Jun)", "Q2 (Jul–Sep)", "Q3 (Oct–Dec)", "Q4 (Jan–Mar)"];
         const selq = fiscalQuarterOfMonth(ref.getMonth());
         sel.innerHTML = `<option value="">Current quarter</option>` +
           [1, 2, 3, 4].map((q, i) =>
@@ -2372,7 +2372,7 @@
         const asofM = firstOfMonthDate(ref.getFullYear(), ref.getMonth());
         let opts = `<option value="">Current month</option>`;
         for (let i = 0; i < 12; i++) {
-          const cal = (2 + i) % 12;                       // fiscal order: Mar … Feb
+          const cal = (3 + i) % 12;                       // fiscal order: Apr … Mar
           const v = firstOfMonthDate(SHEET_YEAR, cal);
           const label = new Date(v + "T00:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
           opts += `<option value="${v}"${v === asofM ? " selected" : ""}>${label}</option>`;
