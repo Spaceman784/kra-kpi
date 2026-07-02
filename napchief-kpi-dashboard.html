@@ -1557,9 +1557,9 @@
           });
         }
         const p = people.get(r.person);
-        const key = `${r.tier}::${r.kpi_name}`;
+        const key = `${r.tier}::${r.kpi_key || r.kpi_name}`;
         if (!p._index.has(key)) {
-          const kpi = { name: r.kpi_name, goal_dir: (r.goal_dir || "up").toLowerCase(), history: [] };
+          const kpi = { name: r.kpi_name, _key: r.kpi_key || r.kpi_name, goal_dir: (r.goal_dir || "up").toLowerCase(), history: [] };
           p._index.set(key, kpi);
           if (p[r.tier]) p[r.tier].push(kpi);
         }
@@ -1643,6 +1643,11 @@
       const rows = [], catalog = [];
       const tierKey = cadence === "Weekly" ? "northStar" : cadence === "Monthly" ? "secondary" : "tertiary";
       let curMonthIdx = null, curQuarter = null;
+      // Some trackers repeat an identically-worded KPI name multiple times within the
+      // same quarter/month block (differing only in bold formatting, which CSV strips).
+      // Track each name's position within its block so duplicates stay distinct rows
+      // instead of merging into one — while still displaying the same visible name.
+      let blockToken = null, nameOccurrence = new Map();
       for (const r of grid) {
         const joined = r.join(" ");
         if (cadence === "Weekly") {
@@ -1653,14 +1658,19 @@
           const m = joined.match(/\b(Q[1-4])\b/i);
           if (m) curQuarter = parseInt(m[1][1], 10);
         }
+        const curToken = cadence === "Weekly" ? curMonthIdx : cadence === "Monthly" ? curQuarter : "single";
+        if (curToken !== blockToken) { blockToken = curToken; nameOccurrence = new Map(); }
         const tier = (r[0] || "").trim();
         const altRow = !tier && /^(weekly|monthly|quarterly)$/i.test((r[1] || "").trim());
         if (!/^T[123]$/.test(tier) && !altRow) continue;
         const kpi = (r[2] || "").trim();
         if (!kpi) continue;
+        const seen = nameOccurrence.get(kpi) || 0;
+        nameOccurrence.set(kpi, seen + 1);
+        const kpiKey = seen > 0 ? `${kpi}__dup${seen}` : kpi;
         const gd = goalDirFor(kpi);
         const roll = ({ sum: "sum", avg: "avg", average: "avg", last: "last" })[(r[3] || "").trim().toLowerCase()];
-        catalog.push({ person: src.person, role: src.role, dept: src.dept, tierKey, kpi_name: kpi, goal_dir: gd, roll });
+        catalog.push({ person: src.person, role: src.role, dept: src.dept, tierKey, kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd, roll });
         // Comments column sits 4 columns after the last period's Actual column
         // (Quarter/Month/Year Target, Actual, vs Target, Achieved % come first).
         const periodCount = cadence === "Monthly" ? 3 : 4;
@@ -1670,7 +1680,7 @@
           if (period == null || String(actual).trim() === "") return;
           rows.push({
             person: src.person, role: src.role, dept: src.dept, tier: tierKey,
-            kpi_name: kpi, goal_dir: gd, period_start: period,
+            kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd, period_start: period,
             target: String(target).trim(), actual: String(actual).trim(),
             status: statusFor(target, actual, gd), notes: rowNotes
           });
@@ -1702,8 +1712,9 @@
         if (!p.role) p.role = c.role;
         if (!p.dept || p.dept === "—") p.dept = c.dept;
         const list = p[c.tierKey] || (p[c.tierKey] = []);
-        let k = list.find(x => x.name === c.kpi_name);
-        if (!k) { k = { name: c.kpi_name, goal_dir: c.goal_dir, history: [] }; list.push(k); }
+        const ckey = c.kpi_key || c.kpi_name;
+        let k = list.find(x => (x._key || x.name) === ckey);
+        if (!k) { k = { name: c.kpi_name, _key: ckey, goal_dir: c.goal_dir, history: [] }; list.push(k); }
         if (c.roll && !k.roll) k.roll = c.roll;   // honor the sheet's Roll-up (Sum/Avg) column
       }
       return people;
