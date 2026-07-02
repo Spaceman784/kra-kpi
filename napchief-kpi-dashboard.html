@@ -2021,25 +2021,8 @@
         totalHTML = `<td class="cell-target-val total-col">—</td><td class="cell-empty-val total-col">—</td>`;
       }
 
-      // VS last week — show previous value + delta
-      const dataIdx = cells.map((c, i) => (c && !isNaN(num(c.actual))) ? i : -1).filter(i => i >= 0);
-      const prior = vsPrior(cells, kpi.goal_dir);
-      let vsHTML;
-      if (prior && dataIdx.length >= 2) {
-        const prevCell = cells[dataIdx[dataIdx.length - 2]];
-        const prevVal = prevCell ? prevCell.actual : "—";
-        const arrow = prior.text.startsWith("+") ? "▲" : prior.text.startsWith("−") ? "▼" : "—";
-        const cls = prior.direction === "up" ? "change-up" : prior.direction === "down" ? "change-down" : "change-flat";
-        vsHTML = `<td class="vs-col vs-cell">
-      <span class="vs-prev">Last: ${prevVal}</span>
-      <span class="vs-delta ${cls}">${arrow} ${prior.text}</span>
-    </td>`;
-      } else {
-        vsHTML = `<td class="vs-col vs-cell"><span class="vs-delta change-flat">—</span></td>`;
-      }
-
-      // Total columns count: 1 (kpi) + cols*2 (target+actual per week) + 2 (total target+actual) + 1 (vs)
-      const totalColCount = 1 + cols.length * 2 + 2 + 1;
+      // Total columns count: 1 (kpi) + cols*2 (target+actual per week) + 2 (total target+actual)
+      const totalColCount = 1 + cols.length * 2 + 2;
       const note = lastWithData && lastWithData.notes
         ? `<tr class="kpi-notes-row"><td colspan="${totalColCount}">${lastWithData.notes}</td></tr>` : "";
 
@@ -2048,7 +2031,6 @@
       <td class="kpi-col"><span class="dot ${status}" title="${STATUS_LABEL[status] || 'Not updated'}"></span>${kpi.name}</td>
       ${cellsHTML}
       ${totalHTML}
-      ${vsHTML}
     </tr>
     ${note}`;
     }
@@ -2094,7 +2076,6 @@
               <th class="kpi-col" rowspan="2">KPI / Metric</th>
               ${weekHeaders}
               <th class="total-col" colspan="2">${rollupHeader(meta.cadence)} Total</th>
-              <th class="vs-col" rowspan="2">${changeHeader(meta.cadence)}</th>
             </tr>
             <tr class="sub-row">
               ${subHeaders}
