@@ -1180,6 +1180,45 @@
     /* Clickable person name → opens their sheet (text looks unchanged) */
     .person-link { color: inherit; text-decoration: none; cursor: pointer; }
     .person-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    /* Multi-link KPI names: hover reveals a small popup listing each linked sheet. */
+    .kpi-link-group {
+      position: relative;
+      display: inline;
+      cursor: pointer;
+      border-bottom: 1px dashed var(--ink-3);
+    }
+    .kpi-link-popup {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 20;
+      margin-top: 6px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow-strong);
+      padding: 6px;
+      min-width: 240px;
+      white-space: normal;
+    }
+    .kpi-link-group:hover .kpi-link-popup { display: block; }
+    .kpi-link-popup a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-2);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .kpi-link-popup a:hover { background: var(--chip); color: var(--ink); }
+    .kpi-link-popup a::after { content: "↗"; color: var(--ink-4); font-size: 12px; }
   </style>
 </head>
 
@@ -2011,6 +2050,16 @@
     const KPI_LINKS = {
       "Sheetal S.::Winning Video Ads vs Total Delivered (Win Rate %)":
         "https://docs.google.com/spreadsheets/d/1fmYr2Kucwc7JTVfodXLKzxmt_7QH-_9Ca7XeL6tpHfA/edit?gid=0",
+      "Sheetal S.::All New SKUs with Ads Live Within 7 Days of Drop (%)":
+        "https://docs.google.com/spreadsheets/d/1v2DnyTUfC37Umy8fJoYRtarnfEE-eTDqwvXjRb5efUU/edit?gid=0",
+      "Sheetal S.::Overall Ads CTR":
+        "https://docs.google.com/spreadsheets/d/1TWZcYmOs--Ff0X0MYK7NJPNE0w1o16g1v_UeGsVSaOs/edit?usp=sharing",
+      "Sheetal S.::Video Ads Given vs Scaled at ₹40k+ (Volume vs Quality)":
+        "https://docs.google.com/spreadsheets/d/1fmYr2Kucwc7JTVfodXLKzxmt_7QH-_9Ca7XeL6tpHfA/edit?usp=sharing",
+      "Sheetal S.::Target Achieved: ROAS, New Customers & Collection Movement via Content": [
+        { label: "ROAS & New Customers", url: "https://docs.google.com/spreadsheets/d/1UuaZOFisjqjnht-qRMa07sbZjuAZCHbCCEkYHB8_QDo/edit?usp=sharing" },
+        { label: "Collection Movement vs Content", url: "https://docs.google.com/spreadsheets/d/1V9CZ1Gm8-3k2HHd1fK0UL5N-snRLE34pH_YtMjapIZo/edit?usp=sharing" },
+      ],
     };
     function kpiLinkFor(personName, kpiName) {
       return KPI_LINKS[`${personName}::${kpiName}`] || null;
@@ -2059,9 +2108,14 @@
         ? `<tr class="kpi-notes-row"><td colspan="${totalColCount}">${lastWithData.notes}</td></tr>` : "";
 
       const link = kpiLinkFor(personName, kpi.name);
-      const nameHtml = link
-        ? `<a class="person-link" href="${link}" target="_blank" rel="noopener" title="Open reference sheet">${kpi.name}</a>`
-        : kpi.name;
+      let nameHtml = kpi.name;
+      if (Array.isArray(link)) {
+        const items = link.map(l =>
+          `<a href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("");
+        nameHtml = `<span class="kpi-link-group">${kpi.name}<span class="kpi-link-popup">${items}</span></span>`;
+      } else if (link) {
+        nameHtml = `<a class="person-link" href="${link}" target="_blank" rel="noopener" title="Open reference sheet">${kpi.name}</a>`;
+      }
 
       return `
     <tr>
