@@ -1865,6 +1865,18 @@
       if (c === '' || c === '-' || c === '.') return NaN;
       return parseFloat(c);
     }
+    /* Add Indian-style comma grouping (1,000 · 10,00,000 · 1,00,00,000) to the
+       first number found in a string, leaving any ₹/%/L/Cr suffix untouched. */
+    function indianCommas(raw) {
+      if (raw === null || raw === undefined) return raw;
+      const s = String(raw);
+      return s.replace(/(\d+)(\.\d+)?/, (match, intPart, decPart) => {
+        if (intPart.length <= 3) return match;
+        const last3 = intPart.slice(-3);
+        const rest = intPart.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+        return `${rest},${last3}${decPart || ""}`;
+      });
+    }
     function unitSuffix(sample) { // trailing unit like L, Cr, K, M (e.g. "₹18.4L" → "L")
       const m = String(sample || "").match(/[\d.]\s*(L|Cr|K|M|k|m)\s*$/);
       return m ? m[1] : "";
@@ -2036,10 +2048,9 @@
     function fmtAgg(v, sample) {
       if (v === null || isNaN(v)) return "—";
       const s = String(sample || "");
-      const body = Math.abs(v) >= 100 ? v.toFixed(0)
+      const body = indianCommas(Math.abs(v) >= 100 ? v.toFixed(0)
         : Math.abs(v) >= 10 ? v.toFixed(1)
-          : v.toFixed(2).replace(/\.?0+$/, "");
-      if (s.includes("₹")) return `₹${body}${unitSuffix(s)}`;
+          : v.toFixed(2).replace(/\.?0+$/, ""));
       if (s.includes("%")) return `${body}%`;
       if (s.includes("x")) return `${body}x`;
       return `${body}${unitSuffix(s)}`;
@@ -2060,6 +2071,12 @@
         { label: "ROAS & New Customers", url: "https://docs.google.com/spreadsheets/d/1UuaZOFisjqjnht-qRMa07sbZjuAZCHbCCEkYHB8_QDo/edit?usp=sharing" },
         { label: "Collection Movement vs Content", url: "https://docs.google.com/spreadsheets/d/1V9CZ1Gm8-3k2HHd1fK0UL5N-snRLE34pH_YtMjapIZo/edit?usp=sharing" },
       ],
+      "Sheetal S.::% Spend on Proven vs New Creative Formats (70/30 target)":
+        "https://docs.google.com/spreadsheets/d/1-BMBoG5q6CEptRaX9Xcn5hyKYEY6A2FxxeGJWT72-bg/edit?gid=0#gid=0",
+      "Sheetal S.::Lifespan of a Winning Creative (Days before ROAS drop)":
+        "https://docs.google.com/spreadsheets/d/1OaJIyiUH9-rtxjqOjDTorNLBXzvEMxUpWivxpFkc8KE/edit?gid=0#gid=0",
+      "Sheetal S.::Comms CTR & Conversion % (Email/SMS)":
+        "https://docs.google.com/spreadsheets/d/11uK6i-GOJldNlpzQHvpsSDItmzrVfi988k85aeEYZ9w/edit?gid=953845984#gid=953845984",
     };
     function kpiLinkFor(personName, kpiName) {
       return KPI_LINKS[`${personName}::${kpiName}`] || null;
@@ -2088,8 +2105,8 @@
               <td class="cell-empty-val${nowCls}">—</td>`;
         }
         const st = effectiveStatus(c.status);
-        return `<td class="cell-target-val week-start${nowCls}">${c.target}</td>
-            <td class="cell-actual-val s-${st}${nowCls}">${c.actual}</td>`;
+        return `<td class="cell-target-val week-start${nowCls}">${indianCommas(c.target)}</td>
+            <td class="cell-actual-val s-${st}${nowCls}">${indianCommas(c.actual)}</td>`;
       }).join("");
 
       // Total month rollup — Target | Actual
