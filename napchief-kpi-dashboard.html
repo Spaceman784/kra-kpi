@@ -1683,24 +1683,42 @@
         const commentsIdx = 4 + periodCount * 2 + 4;
         const rowNotes = (r[commentsIdx] || "").trim();
         const emit = (period, target, actual) => {
-          if (period == null || String(actual).trim() === "") return;
+          const a = String(actual).trim();
+          if (period == null || a === "" || a === "-") return;
           rows.push({
             person: src.person, role: src.role, dept: src.dept, tier: tierKey,
             kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd, period_start: period,
-            target: String(target).trim(), actual: String(actual).trim(),
+            target: String(target).trim(), actual: a,
             status: statusFor(target, actual, gd), notes: rowNotes
           });
         };
+        // Where the Total (Month/Quarter/Year) Target+Actual columns sit — right after
+        // the per-period columns. Some trackers only fill these in directly and leave
+        // every individual period as a "-" placeholder; fall back to the Total columns
+        // for that KPI so its real numbers still show instead of a blank row.
+        const totalTargetIdx = 4 + periodCount * 2;
+        const totalActualIdx = totalTargetIdx + 1;
+        let anyPeriodValid = false;
+        const trackValid = (period, target, actual) => {
+          if (!isNaN(num(actual))) anyPeriodValid = true;
+          emit(period, target, actual);
+        };
+        let periodDates = [];
         if (cadence === "Weekly") {
           if (curMonthIdx === null) continue;
-          const mondays = mondaysOfMonth(SHEET_YEAR, curMonthIdx);
-          for (let i = 0; i < 4; i++) emit(mondays[i], r[4 + i * 2], r[5 + i * 2]);
+          periodDates = mondaysOfMonth(SHEET_YEAR, curMonthIdx);
+          for (let i = 0; i < 4; i++) trackValid(periodDates[i], r[4 + i * 2], r[5 + i * 2]);
         } else if (cadence === "Monthly") {
           if (curQuarter === null) continue;
           // April-start fiscal quarters: Q1 = Apr/May/Jun, Q2 = Jul/Aug/Sep, etc.
-          for (let i = 0; i < 3; i++) emit(fiscalMonthDate(curQuarter, i), r[4 + i * 2], r[5 + i * 2]);
+          periodDates = [0, 1, 2].map(i => fiscalMonthDate(curQuarter, i));
+          for (let i = 0; i < 3; i++) trackValid(periodDates[i], r[4 + i * 2], r[5 + i * 2]);
         } else {
-          for (let q = 0; q < 4; q++) emit(firstOfQuarterDate(SHEET_YEAR, q + 1), r[4 + q * 2], r[5 + q * 2]);
+          periodDates = [1, 2, 3, 4].map(q => firstOfQuarterDate(SHEET_YEAR, q));
+          for (let q = 0; q < 4; q++) trackValid(periodDates[q], r[4 + q * 2], r[5 + q * 2]);
+        }
+        if (!anyPeriodValid && !isNaN(num(r[totalActualIdx])) && periodDates.length) {
+          emit(periodDates[periodDates.length - 1], r[totalTargetIdx], r[totalActualIdx]);
         }
       }
       return { rows, catalog };
