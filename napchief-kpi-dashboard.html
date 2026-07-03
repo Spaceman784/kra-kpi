@@ -1640,6 +1640,39 @@
     /* Reshape one tracker tab's grid into { rows, catalog }.
        rows   = long-format entries for cells that have an Actual.
        catalog = every KPI seen (so the person/KPI shows even before any data). */
+    /* Read a tab's own header row (Tier, Cadence, KPI/Metric, Roll-up, W1 Target,
+       W1 Actual, ...) and build a name → column-index map for that specific block,
+       instead of assuming fixed positions. This is what lets the parser survive
+       inserted/reordered columns and varying period counts across different sheets. */
+    function detectColumnMap(headerRow) {
+      const cell0 = (headerRow[0] || "").trim().toLowerCase();
+      const cell1 = (headerRow[1] || "").trim().toLowerCase();
+      if (cell0 !== "tier" || cell1 !== "cadence") return null;
+      const periodTargetIdx = [], periodActualIdx = [];
+      let totalTargetIdx = null, totalActualIdx = null, commentsIdx = null;
+      for (let i = 4; i < headerRow.length; i++) {
+        const raw = (headerRow[i] || "").replace(/\s+/g, " ").trim();
+        if (!raw) continue;
+        // Strip a trailing month annotation like "M1 Target (Apr)" → "M1 Target" so the
+        // Target/Actual end-anchor still matches regardless of that extra note.
+        const label = raw.replace(/\(.*\)\s*$/, "").trim();
+        if (/^vs\s*target/i.test(label)) continue; // not needed downstream, skip
+        if (/^achieved/i.test(label)) continue;
+        if (/^comment/i.test(label)) { commentsIdx = i; continue; }
+        // Total-column headers ("Quarter Target", "Month Actual", "Year Target", ...)
+        // are checked first so they don't get swept up by the generic per-period match.
+        if (/^(month|quarter|year)\s*target\b/i.test(label)) { totalTargetIdx = i; continue; }
+        if (/^(month|quarter|year)\s*actual\b/i.test(label)) { totalActualIdx = i; continue; }
+        // Per-period columns vary a lot by sheet — "W1 Target", "M1 Target (Apr)",
+        // "Q1 Target", "Apr Target", even sheet typos like "W2 Actual3" — just look
+        // for the word "target"/"actual" appearing anywhere in the label.
+        if (/target/i.test(label)) { periodTargetIdx.push(i); continue; }
+        if (/actual/i.test(label)) { periodActualIdx.push(i); continue; }
+      }
+      if (!periodTargetIdx.length || totalTargetIdx == null) return null;
+      return { periodTargetIdx, periodActualIdx, totalTargetIdx, totalActualIdx, commentsIdx };
+    }
+
     function parseTrackerGrid(grid, cadence, src) {
       const rows = [], catalog = [];
       const tierKey = cadence === "Weekly" ? "northStar" : cadence === "Monthly" ? "secondary" : "tertiary";
@@ -1649,7 +1682,12 @@
       // Track each name's position within its block so duplicates stay distinct rows
       // instead of merging into one — while still displaying the same visible name.
       let blockToken = null, nameOccurrence = new Map(), sawTierInBlock = false;
+      let colMap = null;
       for (const r of grid) {
+        // Month/quarter block detection must run on every row regardless of whether a
+        // column header has been seen yet — otherwise the very first block's own month
+        // label (e.g. "TIER 1 — NORTH STAR METRIC April") gets skipped and its whole
+        // block silently loses its date context.
         const joined = r.join(" ");
         if (cadence === "Weekly") {
           // Matches "METRIC June", "METRICS JUNE", "NORTH STAR METRIC - JUNE", etc.
@@ -1659,6 +1697,11 @@
           const m = joined.match(/\b(Q[1-4])\b/i);
           if (m) curQuarter = parseInt(m[1][1], 10);
         }
+
+        const headerMap = detectColumnMap(r);
+        if (headerMap) { colMap = headerMap; continue; }
+        if (!colMap) continue; // no header seen yet for this tab — nothing to parse safely
+
         const curToken = cadence === "Weekly" ? curMonthIdx : cadence === "Monthly" ? curQuarter : "single";
         if (curToken !== blockToken) { blockToken = curToken; nameOccurrence = new Map(); sawTierInBlock = false; }
         const tier = (r[0] || "").trim();
@@ -1678,11 +1721,7 @@
         const gd = goalDirFor(kpi);
         const roll = ({ sum: "sum", avg: "avg", average: "avg", last: "last" })[(r[3] || "").trim().toLowerCase()];
         catalog.push({ person: src.person, role: src.role, dept: src.dept, tierKey, kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd, roll });
-        // Comments column sits 4 columns after the last period's Actual column
-        // (Quarter/Month/Year Target, Actual, vs Target, Achieved % come first).
-        const periodCount = cadence === "Monthly" ? 3 : 4;
-        const commentsIdx = 4 + periodCount * 2 + 4;
-        const rowNotes = (r[commentsIdx] || "").trim();
+        const rowNotes = colMap.commentsIdx != null ? (r[colMap.commentsIdx] || "").trim() : "";
         const emit = (period, target, actual) => {
           const a = String(actual).trim();
           const t = String(target).trim();
@@ -1698,41 +1737,39 @@
             status: hasActual ? statusFor(target, actual, gd) : "not-updated", notes: rowNotes
           });
         };
-        // Where the Total (Month/Quarter/Year) Target+Actual columns sit — right after
-        // the per-period columns. Some trackers only fill these in directly and leave
-        // every individual period as a "-" placeholder; fall back to the Total columns
-        // for that KPI so its real numbers still show instead of a blank row.
-        const totalTargetIdx = 4 + periodCount * 2;
-        const totalActualIdx = totalTargetIdx + 1;
-        let anyPeriodValid = false;
-        const trackValid = (period, target, actual) => {
-          const a = String(actual).trim(), t = String(target).trim();
-          if ((a !== "" && a !== "-") || (t !== "" && t !== "-")) anyPeriodValid = true;
-          emit(period, target, actual);
-        };
+        const periodN = colMap.periodTargetIdx.length;
         let periodDates = [];
         if (cadence === "Weekly") {
           if (curMonthIdx === null) continue;
           periodDates = mondaysOfMonth(SHEET_YEAR, curMonthIdx);
-          for (let i = 0; i < 4; i++) trackValid(periodDates[i], r[4 + i * 2], r[5 + i * 2]);
         } else if (cadence === "Monthly") {
           if (curQuarter === null) continue;
           // April-start fiscal quarters: Q1 = Apr/May/Jun, Q2 = Jul/Aug/Sep, etc.
           periodDates = [0, 1, 2].map(i => fiscalMonthDate(curQuarter, i));
-          for (let i = 0; i < 3; i++) trackValid(periodDates[i], r[4 + i * 2], r[5 + i * 2]);
         } else {
           periodDates = [1, 2, 3, 4].map(q => firstOfQuarterDate(SHEET_YEAR, q));
-          for (let q = 0; q < 4; q++) trackValid(periodDates[q], r[4 + q * 2], r[5 + q * 2]);
         }
-        if (!anyPeriodValid && !isNaN(num(r[totalActualIdx])) && periodDates.length) {
-          // No weekly/monthly breakdown exists — feed the sheet's own Total figures
-          // into the Total column only, marked so they never render as a fake week cell.
+        const n = Math.min(periodN, periodDates.length);
+        for (let i = 0; i < n; i++) {
+          emit(periodDates[i], r[colMap.periodTargetIdx[i]], r[colMap.periodActualIdx[i]]);
+        }
+        // Always capture the sheet's OWN Total (Month/Quarter/Year) Target+Actual —
+        // whether or not a per-period breakdown also exists — so the Total column is
+        // an exact mirror of the sheet rather than a client-recomputed rollup that can
+        // come up blank (e.g. targets filled in for every week but no actuals yet).
+        // Marked is_total_only so it never renders as a fake individual week cell.
+        const totalTargetStr = colMap.totalTargetIdx != null ? String(r[colMap.totalTargetIdx]).trim() : "";
+        const totalActualStr = colMap.totalActualIdx != null ? String(r[colMap.totalActualIdx]).trim() : "";
+        const hasTotalTarget = totalTargetStr !== "" && totalTargetStr !== "-";
+        const hasTotalActual = totalActualStr !== "" && totalActualStr !== "-";
+        if ((hasTotalTarget || hasTotalActual) && periodDates.length) {
           rows.push({
             person: src.person, role: src.role, dept: src.dept, tier: tierKey,
             kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd,
             period_start: periodDates[periodDates.length - 1],
-            target: String(r[totalTargetIdx]).trim(), actual: String(r[totalActualIdx]).trim(),
-            status: statusFor(r[totalTargetIdx], r[totalActualIdx], gd), notes: rowNotes,
+            target: totalTargetStr, actual: totalActualStr,
+            status: hasTotalActual ? statusFor(totalTargetStr, totalActualStr, gd) : "not-updated",
+            notes: rowNotes,
             is_total_only: true,
           });
         }
@@ -2178,12 +2215,16 @@
             <td class="cell-actual-val ${actualCls}${nowCls}">${actualText}</td>`;
       }).join("");
 
-      // Total month rollup — Target | Actual. Falls back to the sheet's own Total
-      // figures when no per-period breakdown exists to roll up from.
-      let agg = rollup(cells, rollupType(kpi, cadence));
-      if (!agg && totalOnly) {
+      // Total month/quarter/year column — always mirrors the sheet's own Total figures
+      // when it has one, rather than a client-recomputed rollup (which comes up blank
+      // whenever weekly Targets exist but Actuals don't). Only recompute from the
+      // per-period cells when the sheet itself has no Total value for this KPI.
+      let agg = null;
+      if (totalOnly) {
         const t = num(totalOnly.target), a = num(totalOnly.actual);
         agg = { target: isNaN(t) ? null : t, actual: a };
+      } else {
+        agg = rollup(cells, rollupType(kpi, cadence));
       }
       let totalHTML;
       if (agg) {
@@ -2310,13 +2351,16 @@
       const cadence = TIER_META[tierKey].cadence;
       const cols = periodColumns(p, tierKey);
       const cells = cols.map(pd => rowAtPeriod(k.history, pd, cadence));
-      const withData = cells.filter(c => c && String(c.actual).trim() !== "" && !isNaN(num(c.actual)));
+      // Sheet's own Total figures always win over a client-recomputed rollup — see
+      // the matching note in kpiRow().
+      const totalOnly = totalOnlyEntryFor(k.history, cols, cadence);
       let agg;
-      if (!withData.length) {
-        const totalOnly = totalOnlyEntryFor(k.history, cols, cadence);
-        if (!totalOnly || isNaN(num(totalOnly.actual))) return "not-updated";
+      if (totalOnly) {
+        if (isNaN(num(totalOnly.actual))) return "not-updated";
         agg = { target: num(totalOnly.target), actual: num(totalOnly.actual) };
       } else {
+        const withData = cells.filter(c => c && String(c.actual).trim() !== "" && !isNaN(num(c.actual)));
+        if (!withData.length) return "not-updated";
         agg = rollup(cells, rollupType(k, cadence));
       }
       const a = agg.actual, t = agg.target;
