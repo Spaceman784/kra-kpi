@@ -1566,6 +1566,7 @@
         p._index.get(key).history.push({
           period: r.period_start || r.period, target: r.target, actual: r.actual,
           status: (r.status || "watch").toLowerCase(), notes: r.notes || "",
+          is_total_only: !!r.is_total_only,
         });
       });
       for (const p of people.values()) {
@@ -1684,12 +1685,17 @@
         const rowNotes = (r[commentsIdx] || "").trim();
         const emit = (period, target, actual) => {
           const a = String(actual).trim();
-          if (period == null || a === "" || a === "-") return;
+          const t = String(target).trim();
+          const hasActual = a !== "" && a !== "-";
+          const hasTarget = t !== "" && t !== "-";
+          // Show the period even with no Actual yet, as long as a Target was set —
+          // Target displays, Actual stays a dash, status shows as "not updated".
+          if (period == null || (!hasActual && !hasTarget)) return;
           rows.push({
             person: src.person, role: src.role, dept: src.dept, tier: tierKey,
             kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd, period_start: period,
-            target: String(target).trim(), actual: a,
-            status: statusFor(target, actual, gd), notes: rowNotes
+            target: t, actual: hasActual ? a : "",
+            status: hasActual ? statusFor(target, actual, gd) : "not-updated", notes: rowNotes
           });
         };
         // Where the Total (Month/Quarter/Year) Target+Actual columns sit — right after
@@ -1700,7 +1706,8 @@
         const totalActualIdx = totalTargetIdx + 1;
         let anyPeriodValid = false;
         const trackValid = (period, target, actual) => {
-          if (!isNaN(num(actual))) anyPeriodValid = true;
+          const a = String(actual).trim(), t = String(target).trim();
+          if ((a !== "" && a !== "-") || (t !== "" && t !== "-")) anyPeriodValid = true;
           emit(period, target, actual);
         };
         let periodDates = [];
@@ -1718,7 +1725,16 @@
           for (let q = 0; q < 4; q++) trackValid(periodDates[q], r[4 + q * 2], r[5 + q * 2]);
         }
         if (!anyPeriodValid && !isNaN(num(r[totalActualIdx])) && periodDates.length) {
-          emit(periodDates[periodDates.length - 1], r[totalTargetIdx], r[totalActualIdx]);
+          // No weekly/monthly breakdown exists — feed the sheet's own Total figures
+          // into the Total column only, marked so they never render as a fake week cell.
+          rows.push({
+            person: src.person, role: src.role, dept: src.dept, tier: tierKey,
+            kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd,
+            period_start: periodDates[periodDates.length - 1],
+            target: String(r[totalTargetIdx]).trim(), actual: String(r[totalActualIdx]).trim(),
+            status: statusFor(r[totalTargetIdx], r[totalActualIdx], gd), notes: rowNotes,
+            is_total_only: true,
+          });
         }
       }
       return { rows, catalog };
@@ -1885,7 +1901,14 @@
       return iso;
     }
     function rowAtPeriod(history, normalizedPeriod, cadence) {
-      return (history || []).find(h => normalizePeriod(h.period, cadence) === normalizedPeriod) || null;
+      return (history || []).find(h => !h.is_total_only && normalizePeriod(h.period, cadence) === normalizedPeriod) || null;
+    }
+    /* A KPI whose sheet only fills the Month/Quarter/Year Total (no weekly/monthly
+       breakdown) gets one "total-only" history entry — it must feed the Total column
+       but never appear inside an individual week/month cell. Look it up separately. */
+    function totalOnlyEntryFor(history, cols, cadence) {
+      const set = new Set(cols);
+      return (history || []).find(h => h.is_total_only && set.has(normalizePeriod(h.period, cadence))) || null;
     }
     function latestAtOrBefore(history, normalizedPeriod, cadence) {
       let res = null;
@@ -2133,7 +2156,8 @@
     /* One <tr> per KPI — Excel-style with separate Target / Actual columns. */
     function kpiRow(kpi, cols, cadence, personName) {
       const cells = cols.map(p => rowAtPeriod(kpi.history, p, cadence));
-      const lastWithData = [...cells].reverse().find(Boolean);
+      const totalOnly = totalOnlyEntryFor(kpi.history, cols, cadence);
+      const lastWithData = [...cells].reverse().find(Boolean) || totalOnly;
       const rawStatus = lastWithData ? lastWithData.status : "not-updated";
       const status = effectiveStatus(rawStatus);
       const sampleVal = lastWithData ? lastWithData.actual : "";
@@ -2147,12 +2171,20 @@
               <td class="cell-empty-val${nowCls}">—</td>`;
         }
         const st = effectiveStatus(c.status);
-        return `<td class="cell-target-val week-start${nowCls}">${indianCommas(c.target)}</td>
-            <td class="cell-actual-val s-${st}${nowCls}">${indianCommas(c.actual)}</td>`;
+        const targetText = c.target ? indianCommas(c.target) : "—";
+        const actualText = c.actual ? indianCommas(c.actual) : "—";
+        const actualCls = c.actual ? `s-${st}` : "cell-empty-val";
+        return `<td class="cell-target-val week-start${nowCls}">${targetText}</td>
+            <td class="cell-actual-val ${actualCls}${nowCls}">${actualText}</td>`;
       }).join("");
 
-      // Total month rollup — Target | Actual
-      const agg = rollup(cells, rollupType(kpi, cadence));
+      // Total month rollup — Target | Actual. Falls back to the sheet's own Total
+      // figures when no per-period breakdown exists to roll up from.
+      let agg = rollup(cells, rollupType(kpi, cadence));
+      if (!agg && totalOnly) {
+        const t = num(totalOnly.target), a = num(totalOnly.actual);
+        agg = { target: isNaN(t) ? null : t, actual: a };
+      }
       let totalHTML;
       if (agg) {
         totalHTML = `<td class="cell-target-val total-col">${agg.target === null ? "—" : fmtAgg(agg.target, sampleVal)}</td>
@@ -2279,8 +2311,14 @@
       const cols = periodColumns(p, tierKey);
       const cells = cols.map(pd => rowAtPeriod(k.history, pd, cadence));
       const withData = cells.filter(c => c && String(c.actual).trim() !== "" && !isNaN(num(c.actual)));
-      if (!withData.length) return "not-updated";
-      const agg = rollup(cells, rollupType(k, cadence));
+      let agg;
+      if (!withData.length) {
+        const totalOnly = totalOnlyEntryFor(k.history, cols, cadence);
+        if (!totalOnly || isNaN(num(totalOnly.actual))) return "not-updated";
+        agg = { target: num(totalOnly.target), actual: num(totalOnly.actual) };
+      } else {
+        agg = rollup(cells, rollupType(k, cadence));
+      }
       const a = agg.actual, t = agg.target;
       const good = (t === null || isNaN(t)) ? true : (k.goal_dir === "down" ? a <= t : a >= t);
       return good ? "ontrack" : "off";
