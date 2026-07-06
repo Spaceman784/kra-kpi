@@ -1682,6 +1682,18 @@
       return { periodTargetIdx, periodActualIdx, totalTargetIdx, totalActualIdx, commentsIdx };
     }
 
+    /* Some sheets word the same KPI slightly differently across quarters (e.g. a
+       more detailed name added later). Rather than editing the sheet, map the
+       alternate wording to a canonical name here so both quarters' data merges
+       into one KPI row instead of showing as two separate KPIs. */
+    const KPI_ALIASES = {
+      "Ritik R.::Net Promoter Score (NPS): Calculated from post-purchase surveys": "Net Promoter Score (NPS)",
+      "Ritik R.::Helpdesk Automation Rate — % of queries handled without agent": "Helpdesk Automation Rate",
+    };
+    function canonicalKpiName(person, name) {
+      return KPI_ALIASES[`${person}::${name}`] || name;
+    }
+
     function parseTrackerGrid(grid, cadence, src) {
       const rows = [], catalog = [];
       const tierKey = cadence === "Weekly" ? "northStar" : cadence === "Monthly" ? "secondary" : "tertiary";
@@ -1717,7 +1729,7 @@
         const altRow = !tier && /^(weekly|monthly|quarterly)$/i.test((r[1] || "").trim());
         const isTierRow = /^T[123]$/.test(tier);
         if (isTierRow) sawTierInBlock = true;
-        const kpi = (r[2] || "").trim();
+        const kpi = canonicalKpiName(src.person, (r[2] || "").trim());
         // Nested sub-metrics (e.g. "ROAS", "New Customers" under a combined parent KPI)
         // have a blank Tier/Cadence but a real KPI name — treat them as their own KPI
         // belonging to the last Tier row seen, instead of skipping them.
