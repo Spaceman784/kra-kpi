@@ -504,6 +504,15 @@
       font-size: 14.5px;
     }
 
+    /* Nested sub-metric rows (e.g. "30 Days" / "60 Days" under "Repeat Rate...") —
+       indented, lighter weight, no status dot, matching how they read in the sheet. */
+    table.kpi-table td.kpi-col.child-row {
+      padding-left: 34px;
+      font-weight: 500;
+      color: var(--ink-2);
+      font-size: 13.5px;
+    }
+
     table.kpi-table .kpi-col .dot {
       margin-right: 7px;
       vertical-align: middle;
@@ -1559,7 +1568,7 @@
         const p = people.get(r.person);
         const key = `${r.tier}::${r.kpi_key || r.kpi_name}`;
         if (!p._index.has(key)) {
-          const kpi = { name: r.kpi_name, _key: r.kpi_key || r.kpi_name, goal_dir: (r.goal_dir || "up").toLowerCase(), history: [] };
+          const kpi = { name: r.kpi_name, _key: r.kpi_key || r.kpi_name, goal_dir: (r.goal_dir || "up").toLowerCase(), history: [], parent: r.parent_kpi || null };
           p._index.set(key, kpi);
           if (p[r.tier]) p[r.tier].push(kpi);
         }
@@ -1681,7 +1690,7 @@
       // same quarter/month block (differing only in bold formatting, which CSV strips).
       // Track each name's position within its block so duplicates stay distinct rows
       // instead of merging into one — while still displaying the same visible name.
-      let blockToken = null, nameOccurrence = new Map(), sawTierInBlock = false;
+      let blockToken = null, nameOccurrence = new Map(), sawTierInBlock = false, lastParentName = null;
       let colMap = null;
       for (const r of grid) {
         // Month/quarter block detection must run on every row regardless of whether a
@@ -1703,7 +1712,7 @@
         if (!colMap) continue; // no header seen yet for this tab — nothing to parse safely
 
         const curToken = cadence === "Weekly" ? curMonthIdx : cadence === "Monthly" ? curQuarter : "single";
-        if (curToken !== blockToken) { blockToken = curToken; nameOccurrence = new Map(); sawTierInBlock = false; }
+        if (curToken !== blockToken) { blockToken = curToken; nameOccurrence = new Map(); sawTierInBlock = false; lastParentName = null; }
         const tier = (r[0] || "").trim();
         const altRow = !tier && /^(weekly|monthly|quarterly)$/i.test((r[1] || "").trim());
         const isTierRow = /^T[123]$/.test(tier);
@@ -1715,12 +1724,16 @@
         const childRow = !tier && !altRow && sawTierInBlock && kpi !== "";
         if (!isTierRow && !altRow && !childRow) continue;
         if (!kpi) continue;
+        // Remember which KPI a child row visually belongs to, so the dashboard can
+        // render it as an indented sub-row under its parent instead of a flat row.
+        const parentName = childRow ? lastParentName : null;
+        if (isTierRow || altRow) lastParentName = kpi;
         const seen = nameOccurrence.get(kpi) || 0;
         nameOccurrence.set(kpi, seen + 1);
         const kpiKey = seen > 0 ? `${kpi}__dup${seen}` : kpi;
         const gd = goalDirFor(kpi);
         const roll = ({ sum: "sum", avg: "avg", average: "avg", last: "last" })[(r[3] || "").trim().toLowerCase()];
-        catalog.push({ person: src.person, role: src.role, dept: src.dept, tierKey, kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd, roll });
+        catalog.push({ person: src.person, role: src.role, dept: src.dept, tierKey, kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd, roll, parent_kpi: parentName });
         const rowNotes = colMap.commentsIdx != null ? (r[colMap.commentsIdx] || "").trim() : "";
         const emit = (period, target, actual) => {
           const a = String(actual).trim();
@@ -1734,7 +1747,8 @@
             person: src.person, role: src.role, dept: src.dept, tier: tierKey,
             kpi_name: kpi, kpi_key: kpiKey, goal_dir: gd, period_start: period,
             target: t, actual: hasActual ? a : "",
-            status: hasActual ? statusFor(target, actual, gd) : "not-updated", notes: rowNotes
+            status: hasActual ? statusFor(target, actual, gd) : "not-updated", notes: rowNotes,
+            parent_kpi: parentName,
           });
         };
         const periodN = colMap.periodTargetIdx.length;
@@ -1771,6 +1785,7 @@
             status: hasTotalActual ? statusFor(totalTargetStr, totalActualStr, gd) : "not-updated",
             notes: rowNotes,
             is_total_only: true,
+            parent_kpi: parentName,
           });
         }
       }
@@ -1791,8 +1806,37 @@
         const list = p[c.tierKey] || (p[c.tierKey] = []);
         const ckey = c.kpi_key || c.kpi_name;
         let k = list.find(x => (x._key || x.name) === ckey);
-        if (!k) { k = { name: c.kpi_name, _key: ckey, goal_dir: c.goal_dir, history: [] }; list.push(k); }
+        if (!k) { k = { name: c.kpi_name, _key: ckey, goal_dir: c.goal_dir, history: [], parent: c.parent_kpi || null }; list.push(k); }
         if (c.roll && !k.roll) k.roll = c.roll;   // honor the sheet's Roll-up (Sum/Avg) column
+        if (c.parent_kpi && !k.parent) k.parent = c.parent_kpi;
+      }
+      return people;
+    }
+
+    /* KPIs with data anywhere get added to a person's list as soon as their first
+       real value is found; KPIs with zero data across every period only get created
+       later by applyCatalog and end up appended at the end. That scrambles sheet
+       order — a data-bearing child can land above its always-empty parent header.
+       Re-sort every tier list back into the sheet's own row order (from catalog,
+       which is pushed once per row, in the exact order the sheet lists them). */
+    function sortByCatalogOrder(people, catalog) {
+      const orderMap = new Map();
+      catalog.forEach((c, i) => {
+        const key = `${c.person}::${c.tierKey}::${c.kpi_key || c.kpi_name}`;
+        if (!orderMap.has(key)) orderMap.set(key, i);
+      });
+      for (const p of people) {
+        ["northStar", "secondary", "tertiary"].forEach(t => {
+          if (!p[t]) return;
+          p[t] = p[t].map((k, i) => ({ k, i })).sort((a, b) => {
+            const ai = orderMap.get(`${p.name}::${t}::${a.k._key || a.k.name}`);
+            const bi = orderMap.get(`${p.name}::${t}::${b.k._key || b.k.name}`);
+            if (ai == null && bi == null) return a.i - b.i;
+            if (ai == null) return 1;
+            if (bi == null) return -1;
+            return ai - bi;
+          }).map(x => x.k);
+        });
       }
       return people;
     }
@@ -1872,7 +1916,7 @@
 
         try {
           const { rows, catalog } = await fetchSheetsRows();
-          const people = applyCatalog(rowsToPeople(rows), catalog);
+          const people = sortByCatalogOrder(applyCatalog(rowsToPeople(rows), catalog), catalog);
           document.getElementById("sourcePill").textContent = rows.length
             ? "Source: Google Sheets (live)"
             : "Source: Google Sheets (live · awaiting data)";
@@ -2313,9 +2357,15 @@
         nameHtml = `<a class="person-link" href="${link}" target="_blank" rel="noopener" title="Open reference sheet">${kpi.name}</a>`;
       }
 
+      // Nested sub-metrics (e.g. "30 Days" under "Repeat Rate...") render indented,
+      // without their own status dot — visually grouped under their parent row.
+      const isChild = !!kpi.parent;
+      const kpiColCls = isChild ? "kpi-col child-row" : "kpi-col";
+      const dotHtml = isChild ? "" : `<span class="dot ${status}" title="${STATUS_LABEL[status] || 'Not updated'}"></span>`;
+
       return `
     <tr>
-      <td class="kpi-col"><span class="dot ${status}" title="${STATUS_LABEL[status] || 'Not updated'}"></span>${nameHtml}</td>
+      <td class="${kpiColCls}">${dotHtml}${nameHtml}</td>
       ${cellsHTML}
       ${totalHTML}
     </tr>
@@ -2330,7 +2380,13 @@
 
     function tierTable(person, tierKey) {
       const meta = TIER_META[tierKey];
-      const list = (person[tierKey] || []).filter(k => !HIDDEN_KPIS.has(`${person.name}::${k.name}`));
+      const raw = person[tierKey] || [];
+      // If a KPI's parent is itself hidden, treat it as top-level — otherwise it'd
+      // render indented with no visible parent row above it.
+      raw.forEach(k => {
+        if (k.parent && HIDDEN_KPIS.has(`${person.name}::${k.parent}`)) k.parent = null;
+      });
+      const list = raw.filter(k => !HIDDEN_KPIS.has(`${person.name}::${k.name}`));
       if (!list.length) return "";
       const cols = periodColumns(person, tierKey);
       if (!cols.length) {
