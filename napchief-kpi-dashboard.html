@@ -1901,6 +1901,153 @@
       return { rows, catalog };
     }
 
+    /* =================================================================
+       EM SCORE — separate shared "EM WEEKLY" spreadsheet (one tab per
+       month: "Performance Tracker June", "Performance Tracker July", ...).
+       Fetched by TAB NAME (via the gviz endpoint) rather than a hardcoded
+       gid, so a new month just needs a matching-named tab added to the
+       sheet — no code change here. Adds one extra North Star row per
+       matched person: "EM Score (To-Do / One-Time)".
+       ================================================================= */
+    const EM_SHEET_ID = "12TzqaO72lIkaC8j27K1XuAM1p_aIJTgpZpI2H-z50bY";
+    const EM_CACHE = {}; // monthName -> Map(firstNameLower -> {week: {oneTime:{target,actual}, toDo:{target,actual}}}) | null
+
+    async function fetchEMGridForMonth(monthName) {
+      const tabName = `Performance Tracker ${monthName}`;
+      const url = `https://docs.google.com/spreadsheets/d/${EM_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
+      try {
+        const res = await fetchWithTimeout(url, SHEET_FETCH_TIMEOUT_MS);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const grid = csvGrid(await res.text());
+        // gviz silently falls back to the workbook's FIRST sheet when the
+        // requested tab name doesn't exist (no error, no 404) — so a month
+        // with no matching tab would otherwise get an earlier month's data
+        // mislabeled as its own. Guard against that by confirming the
+        // fetched header actually mentions the month we asked for.
+        const headerText = (grid[0] || []).join(" ");
+        if (!new RegExp(`\\b${monthName}\\b`, "i").test(headerText)) {
+          console.warn("EM sheet: no tab found for", monthName, "(gviz returned a different sheet)");
+          return null;
+        }
+        return grid;
+      } catch (e) {
+        console.warn("EM sheet fetch failed:", monthName, e);
+        return null;
+      }
+    }
+
+    /* Each week block's header only carries the week label + its own date
+       range on the first ("Current Score") column — e.g. "One time W1 1st
+       July - 7th July Current Score". The Target/Actual/Diff columns that
+       follow it keep their plain labels, so blocks are found by scanning
+       for "Current Score" headers and reading the next two columns
+       positionally. The block's start DAY-OF-MONTH is parsed out of that
+       same label (rather than trusting the W1/W2/... label to line up
+       with this month's Week 1/2/... columns) because some months' trackers
+       start mid-month — June's W1 is "15th June", which belongs in Week 3,
+       not Week 1. Matching is done by which 7-day chunk of the month the
+       day falls in (day 1–7 → chunk 0, 8–14 → chunk 1, ...), NOT by
+       snapping to the nearest ISO Monday — the sheet's own week boundaries
+       are just "day 1/8/15/22 of the month", which usually isn't a Monday
+       (e.g. July 2026 starts on a Wednesday), so a Monday-snap would
+       misalign or drop those weeks entirely. */
+    function parseEMGrid(grid) {
+      if (!grid || !grid.length) return null;
+      const header = grid[0];
+      const blocks = [];
+      for (let i = 1; i < header.length; i++) {
+        const label = (header[i] || "").trim();
+        if (!/current score/i.test(label)) continue;
+        const wm = label.match(/W(\d+)/i);
+        if (!wm) continue;
+        const type = /one[- ]?time/i.test(label) ? "oneTime" : (/to-?do/i.test(label) ? "toDo" : null);
+        if (!type) continue;
+        const targetLabel = (header[i + 1] || "").trim();
+        const actualLabel = (header[i + 2] || "").trim();
+        if (!/target/i.test(targetLabel) || !/actual/i.test(actualLabel)) continue;
+        const dm = label.match(/(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)/);
+        const dayOfMonth = dm ? parseInt(dm[1], 10) : null;
+        blocks.push({ week: parseInt(wm[1], 10), type, targetIdx: i + 1, actualIdx: i + 2, dayOfMonth });
+      }
+      if (!blocks.length) return null;
+      const map = new Map();
+      for (let r = 1; r < grid.length; r++) {
+        const row = grid[r];
+        const name = (row[0] || "").trim();
+        if (!name || /^avg/i.test(name)) continue;
+        const key = name.toLowerCase();
+        const weeksObj = map.get(key) || {};
+        blocks.forEach(b => {
+          const wk = weeksObj[b.week] || {};
+          wk[b.type] = { target: (row[b.targetIdx] || "").trim(), actual: (row[b.actualIdx] || "").trim() };
+          if (b.dayOfMonth != null) wk._dayOfMonth = b.dayOfMonth;
+          weeksObj[b.week] = wk;
+        });
+        map.set(key, weeksObj);
+      }
+      return map;
+    }
+
+    async function getEMMapForMonth(monthName, forceRefresh) {
+      if (!forceRefresh && Object.prototype.hasOwnProperty.call(EM_CACHE, monthName)) return EM_CACHE[monthName];
+      const grid = await fetchEMGridForMonth(monthName);
+      const map = grid ? parseEMGrid(grid) : null;
+      EM_CACHE[monthName] = map;
+      return map;
+    }
+
+    /* Values are shown exactly as the sheet has them (already signed
+       percentages) — no reformatting, just "To-Do / One-Time" order. */
+    function fmtEMVal(v) { return v ? v : "—"; }
+    function emSideStatus(target, actual) {
+      const a = num(actual);
+      if (isNaN(a)) return null; // no actual this week — doesn't count either way
+      const t = num(target);
+      if (isNaN(t)) return "ontrack"; // no target set — same convention as the rest of the sheet
+      return a >= t ? "ontrack" : "off";
+    }
+    function buildEMKpi(weeksObj, cols) {
+      const history = [];
+      Object.keys(weeksObj).forEach(weekNum => {
+        const wk = weeksObj[weekNum];
+        if (wk._dayOfMonth == null) return; // couldn't parse a date for this block — skip rather than guess
+        const chunkIdx = Math.floor((wk._dayOfMonth - 1) / 7);
+        if (chunkIdx < 0 || chunkIdx >= cols.length) return; // falls outside the 4 weeks shown for this month
+        const periodDate = cols[chunkIdx];
+        const ot = wk.oneTime || {}, td = wk.toDo || {};
+        if (!(ot.target || ot.actual || td.target || td.actual)) return; // nothing at all this week
+        const otSt = emSideStatus(ot.target, ot.actual);
+        const tdSt = emSideStatus(td.target, td.actual);
+        const status = (otSt === null && tdSt === null) ? "not-updated"
+          : (otSt === "off" || tdSt === "off") ? "off" : "ontrack";
+        history.push({
+          period: periodDate,
+          target: `${fmtEMVal(td.target)} / ${fmtEMVal(ot.target)}`,
+          actual: `${fmtEMVal(td.actual)} / ${fmtEMVal(ot.actual)}`,
+          status, notes: "",
+        });
+      });
+      return { name: "EM Score (To-Do / One-Time)", goal_dir: "up", history, emCombined: true };
+    }
+
+    /* Re-derive each matched person's EM Score row for whichever month is
+       currently selected, replacing any row from a previous month/refresh. */
+    async function applyEMScores(forceRefresh = false) {
+      const d = new Date(asOfDate + "T00:00:00");
+      const monthName = d.toLocaleDateString("en-US", { month: "long" });
+      const map = await getEMMapForMonth(monthName, forceRefresh);
+      const cols = mondaysOfMonth(d.getFullYear(), d.getMonth());
+      PEOPLE.forEach(p => {
+        p.northStar = (p.northStar || []).filter(k => !k.emCombined);
+        if (!map) return;
+        const firstName = p.name.split(/\s+/)[0].trim().toLowerCase();
+        const weeksObj = map.get(firstName);
+        if (!weeksObj) return; // not tracked in the EM sheet, or name doesn't match — skip
+        const kpi = buildEMKpi(weeksObj, cols);
+        if (kpi.history.length) p.northStar.push(kpi);
+      });
+    }
+
     /* Cache auto-expires after this long — everyone lands on data no staler
        than CACHE_TTL_MS old, without needing a manual Refresh click. */
     const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -2339,19 +2486,25 @@
       // when it has one, rather than a client-recomputed rollup (which comes up blank
       // whenever weekly Targets exist but Actuals don't). Only recompute from the
       // per-period cells when the sheet itself has no Total value for this KPI.
-      let agg = null;
-      if (totalOnly) {
-        const t = num(totalOnly.target), a = num(totalOnly.actual);
-        agg = { target: isNaN(t) ? null : t, actual: a };
-      } else {
-        agg = rollup(cells, rollupType(kpi, cadence));
-      }
       let totalHTML;
-      if (agg) {
-        totalHTML = `<td class="cell-target-val total-col">${agg.target === null ? "—" : fmtAgg(agg.target, sampleVal)}</td>
-                <td class="cell-actual-val total-col">${fmtAgg(agg.actual, sampleVal)}</td>`;
-      } else {
+      if (kpi.emCombined) {
+        // Target/Actual here are already "To-Do / One-Time" combined display
+        // strings, not single numbers — a numeric rollup would be meaningless.
         totalHTML = `<td class="cell-target-val total-col">—</td><td class="cell-empty-val total-col">—</td>`;
+      } else {
+        let agg = null;
+        if (totalOnly) {
+          const t = num(totalOnly.target), a = num(totalOnly.actual);
+          agg = { target: isNaN(t) ? null : t, actual: a };
+        } else {
+          agg = rollup(cells, rollupType(kpi, cadence));
+        }
+        if (agg) {
+          totalHTML = `<td class="cell-target-val total-col">${agg.target === null ? "—" : fmtAgg(agg.target, sampleVal)}</td>
+                <td class="cell-actual-val total-col">${fmtAgg(agg.actual, sampleVal)}</td>`;
+        } else {
+          totalHTML = `<td class="cell-target-val total-col">—</td><td class="cell-empty-val total-col">—</td>`;
+        }
       }
 
       // Total columns count: 1 (kpi) + cols*2 (target+actual per week) + 2 (total target+actual)
@@ -2483,6 +2636,13 @@
       const cadence = TIER_META[tierKey].cadence;
       const cols = periodColumns(p, tierKey);
       const cells = cols.map(pd => rowAtPeriod(k.history, pd, cadence));
+      if (k.emCombined) {
+        // Target/Actual are combined display strings here, not numbers — a
+        // numeric rollup doesn't apply. Use the latest week's own precomputed status.
+        const last = [...cells].reverse().find(Boolean);
+        if (!last) return "not-updated";
+        return last.status === "off" ? "off" : "ontrack";
+      }
       // Sheet's own Total figures always win over a client-recomputed rollup — see
       // the matching note in kpiRow().
       const totalOnly = totalOnlyEntryFor(k.history, cols, cadence);
@@ -2691,11 +2851,17 @@
       document.querySelectorAll("#tierPills .pill").forEach(x => x.classList.remove("active"));
       p.classList.add("active"); currentTier = p.dataset.tier; populatePeriodFilter(); refreshBoard();
     }));
-    document.getElementById("asOfDate").addEventListener("change", e => { asOfDate = e.target.value || currentMonthDate(); refreshBoard(); });
+    document.getElementById("asOfDate").addEventListener("change", async e => {
+      asOfDate = e.target.value || currentMonthDate();
+      await applyEMScores();
+      refreshBoard();
+    });
     document.getElementById("rangeFilter").addEventListener("change", e => { currentRange = e.target.value; refreshBoard(); });
     document.getElementById("boardSearch").addEventListener("input", e => { boardSearch = e.target.value; renderBoard(); });
-    document.getElementById("timewarpReset").addEventListener("click", () => {
-      asOfDate = latestAvailable; document.getElementById("asOfDate").value = asOfDate; refreshBoard();
+    document.getElementById("timewarpReset").addEventListener("click", async () => {
+      asOfDate = latestAvailable; document.getElementById("asOfDate").value = asOfDate;
+      await applyEMScores();
+      refreshBoard();
     });
 
     /* Rebuild the as-of week dropdown from the loaded data, keeping the current
@@ -2758,6 +2924,7 @@
     async function loadAndRender(forceRefresh = false) {
       PEOPLE = await loadData(forceRefresh);
       rebuildPeriodControls();
+      await applyEMScores(forceRefresh);
       if (forceRefresh || !localStorage.getItem("napchief-kpis-cache-time")) {
         stampUpdated();
       }
